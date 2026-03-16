@@ -1,0 +1,73 @@
+module Test.String.EditDistance exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import Fuzz exposing (Fuzzer)
+import String.EditDistance as EditDistance
+
+
+tests : Test
+tests =
+    describe "String.EditDistance"
+        [ describe "calculate"
+            [ test "No difference" <| \{} ->
+                EditDistance.calculate "kitten" "kitten"
+                    |> Expect.equal 0
+            , test "One wrong character" <| \{} ->
+                EditDistance.calculate "kitten" "kitsen"
+                    |> Expect.equal 1
+            , test "Deleted character" <| \{} ->
+                EditDistance.calculate "kitten" "kiten"
+                    |> Expect.equal 1
+            , test "Inserted character" <| \{} ->
+                EditDistance.calculate "kitten" "kittten"
+                    |> Expect.equal 1
+            , test "Switched characters" <| \{} ->
+                EditDistance.calculate "kitten" "kitetn"
+                    |> Expect.equal 2
+            , test "Several differences" <| \{} ->
+                EditDistance.calculate "kitten" "sitting"
+                    |> Expect.equal 3
+            , test "Order doesn't matter" <| \{} ->
+                EditDistance.calculate "sitting" "kitten" 
+                    |> Expect.equal 3
+            ]
+        , describe "findMostSimilar" <|
+            let
+                opts =
+                    { maxAmount = 3
+                    , maxDistance = 30
+                    , from =
+                        [ "one"
+                        , "two"
+                        , "three"
+                        , "four"
+                        , "five"
+                        ]
+                    }
+            in
+            [ test "Finds samples with lowest distance" <| \{} ->
+                EditDistance.findMostSimilar
+                    opts
+                    "tre"
+                        -- In all cases, you need to make two modifications to arrive at "tre"
+                        -- Even though maxDistance is set really high, it only finds those
+                        -- that tie for the lowest distance
+                        |> Expect.equal [ "one", "two", "three" ]
+            , test "Low maxDistance might return nothing" <| \{} ->
+                EditDistance.findMostSimilar
+                    { opts | maxDistance = 1 }
+                    "tre"
+                        |> Expect.equal []
+            , test "Exact match is always returned" <| \{} ->
+                EditDistance.findMostSimilar
+                    {opts | maxDistance = 0 }
+                    "three"
+                        |> Expect.equal [ "three" ]
+            , test "Low maxAmount limits size of response" <| \{} ->
+                EditDistance.findMostSimilar
+                    { opts | maxAmount = 2 }
+                    "tre"
+                        |> Expect.equal [ "one", "two" ]
+            ]
+        ]

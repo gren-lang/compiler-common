@@ -1,0 +1,35 @@
+{
+    "type": "package",
+    "platform": "common",
+    "name": "gren-lang/compiler-common",
+    "summary": "Common functionality of the Gren compiler",
+    "license": "BSD-3-Clause",
+    "version": "1.0.0",
+    "exposed-modules": [
+        "Compiler.Ast.Source",
+        "Compiler.Dependencies",
+        "Compiler.ModuleName",
+        "Compiler.PackageName",
+        "Compiler.Platform",
+        "Compiler.License",
+        "Compiler.Parse.Context",
+        "Compiler.Parse.Declaration",
+        "Compiler.Parse.Expression",
+        "Compiler.Parse.Module",
+        "Compiler.Parse.Number",
+        "Compiler.Parse.Operator",
+        "Compiler.Parse.String",
+        "Compiler.Parse.Space",
+        "Compiler.Parse.Pattern",
+        "Compiler.Parse.Variable",
+        "Compiler.Parse.Type",
+        "SemanticVersion",
+        "SemanticVersionRange",
+        "String.EditDistance",
+        "SourcePosition"
+    ],
+    "gren-version": "0.6.0 <= v < 0.7.0",
+    "dependencies": {
+        "gren-lang/core": "7.3.0 <= v < 8.0.0"
+    }
+}

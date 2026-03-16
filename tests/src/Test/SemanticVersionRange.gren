@@ -1,0 +1,107 @@
+module Test.SemanticVersionRange exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import Fuzz exposing (Fuzzer)
+import SemanticVersion as SV
+import SemanticVersionRange as Range
+
+
+tests : Test
+tests =
+    describe "SemanticVersionRange"
+        [ describe "of"
+            [ test "Simple example" <| \{} ->
+                Range.of version110 version200
+                    |> Maybe.withDefault Range.example
+                    |> Expect.all
+                        [ Range.lowerBound >> SV.toString >> Expect.equal "1.1.0"
+                        , Range.upperBound >> SV.toString >> Expect.equal "2.0.0"
+                        ]
+            , test "Left side must be lower than right side" <| \{} ->
+                Range.of version200 version110
+                    |> Expect.equal Nothing
+            ]
+        , describe "fromString"
+            [ test "Simple example" <| \{} ->
+                when Range.fromString "1.2.0 <= v < 2.0.0" is
+                    Just range ->
+                        Expect.all
+                            [ Range.lowerBound >> SV.toString >> Expect.equal "1.2.0"
+                            , Range.upperBound >> SV.toString >> Expect.equal "2.0.0"
+                            ]
+                            range
+
+                    Nothing ->
+                        Expect.fail "Expected fromString to succeed"
+            , test "Simple example, but with wierd whitespace" <| \{} ->
+                when Range.fromString "1.2.0  <= v< 2.0.0" is
+                    Just range ->
+                        Expect.all
+                            [ Range.lowerBound >> SV.toString >> Expect.equal "1.2.0"
+                            , Range.upperBound >> SV.toString >> Expect.equal "2.0.0"
+                            ]
+                            range
+
+                    Nothing ->
+                        Expect.fail "Expected fromString to succeed"
+            , test "<= v < is required" <| \{} ->
+                when Range.fromString "1.2.0 2.0.0" is
+                    Just range ->
+                        Expect.fail "Expected fromString to fail"
+
+                    Nothing ->
+                        Expect.pass
+            ]
+        , describe "intersect"
+            [ test "table" <| \{} ->
+                Expect.all
+                    [ Range.intersect (rangeFrom 1 7 0) >> Expect.equal (Just (rangeFrom 1 7 0))
+                    , Range.intersect (rangeFrom 1 5 0) >> Expect.equal (Just (rangeFrom 1 5 0))
+                    , Range.intersect (rangeFrom 1 2 0) >> Expect.equal (Just (rangeFrom 1 5 0))
+                    , Range.intersect (exact 1 5 0) >> Expect.equal (Just (exact 1 5 0))
+                    , Range.intersect (exact 1 5 2) >> Expect.equal (Just (exact 1 5 2))
+                    , Range.intersect (exact 1 9 9) >> Expect.equal (Just (exact 1 9 9))
+                    , Range.intersect (exact 2 0 0) >> Expect.equal (Nothing)
+                    , Range.intersect (exact 1 4 5) >> Expect.equal (Nothing)
+                    ]
+                    (rangeFrom 1 5 0)
+            ]
+        , describe "compatibleWith"
+            [ test "1.2.4" <| \{} ->
+                Range.compatibleWith { major = 1, minor = 2, patch = 4 }
+                    |> Expect.equal (rangeFrom 1 2 0)
+            , test "0.4.2" <| \{} ->
+                Range.compatibleWith { major = 0, minor = 4, patch = 2 }
+                    |> Expect.equal
+                        (Range.of
+                            { major = 0, minor = 4, patch = 0 }
+                            { major = 0, minor = 5, patch = 0 }
+                            |> Maybe.withDefault Range.example
+                        )
+            ]
+        ]
+
+
+version110 : SV.SemanticVersion
+version110 = { major = 1, minor = 1, patch = 0 }
+
+
+version200 : SV.SemanticVersion
+version200 = { major = 2, minor = 0, patch = 0 }
+
+
+exact : Int -> Int -> Int -> Range.SemanticVersionRange
+exact major minor patch =
+    Range.of
+        { major = major, minor = minor, patch = patch }
+        { major = major, minor = minor, patch = patch + 1 }
+        |> Maybe.withDefault Range.example
+
+
+rangeFrom : Int -> Int -> Int -> Range.SemanticVersionRange
+rangeFrom major minor patch =
+    Range.of
+        { major = major, minor = minor, patch = patch }
+        { major = major + 1, minor = 0, patch = 0 }
+        |> Maybe.withDefault Range.example

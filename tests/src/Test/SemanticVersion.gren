@@ -1,0 +1,85 @@
+module Test.SemanticVersion exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import Fuzz exposing (Fuzzer)
+import SemanticVersion as SV
+
+
+positiveInt : Fuzzer Int
+positiveInt =
+    Fuzz.intRange 0 10000
+
+
+tests : Test
+tests =
+    describe "SemanticVersion"
+        [ describe "fromString"
+            [ Test.fuzz3 positiveInt positiveInt positiveInt "valid version" <| \num1 num2 num3 -> 
+                let
+                    constructedVersion =
+                        [ num1, num2, num3 ]
+                            |> Array.map String.fromInt 
+                            |> String.join "."
+                in
+                when SV.fromString constructedVersion is
+                    Just version ->
+                        Expect.equal
+                            { major = num1
+                            , minor = num2
+                            , patch = num3
+                            }
+                            version
+
+                    Nothing ->
+                        Expect.fail "Expected fromString to pass"
+            , test "inverse of toString" <| \{} ->
+                when SV.fromString "1.5.3" is
+                    Just version ->
+                        Expect.equal "1.5.3" (SV.toString version)
+
+                    Nothing ->
+                        Expect.fail "Expected fromString to succeed"
+            , test "too many parts" <| \{} -> 
+                when SV.fromString "1.2.3.4" is
+                    Just version ->
+                        Expect.fail "This should have failed"
+
+                    Nothing ->
+                        Expect.pass
+            , test "too few parts" <| \{} -> 
+                when SV.fromString "1.2" is
+                    Just version ->
+                        Expect.fail "This should have failed"
+
+                    Nothing ->
+                        Expect.pass
+            , test "numbers must be positive" <| \{} -> 
+                when SV.fromString "1.-2.0" is
+                    Just version ->
+                        Expect.fail "This should have failed"
+
+                    Nothing ->
+                        Expect.pass
+            ]
+        , describe "compare"
+            [ test "LT" <| \{} ->
+                Expect.all
+                    [ SV.compare { major = 1, minor = 0, patch = 0 } >> Expect.equal LT
+                    , SV.compare { major = 1, minor = 1, patch = 0 } >> Expect.equal LT
+                    , SV.compare { major = 1, minor = 5, patch = 0 } >> Expect.equal LT
+                    ]
+                    { major = 1, minor = 5, patch = 1 }
+            , test "EQ" <| \{} ->
+                { major = 2, minor = 1, patch = 5 }
+                    |> SV.compare { major = 2, minor = 1, patch = 5 }
+                    |> Expect.equal EQ
+            , test "GT" <| \{} ->
+                Expect.all
+                    [ SV.compare { major = 1, minor = 5, patch = 2 } >> Expect.equal GT
+                    , SV.compare { major = 1, minor = 6, patch = 0 } >> Expect.equal GT
+                    , SV.compare { major = 2, minor = 0, patch = 0 } >> Expect.equal GT
+                    ]
+                    { major = 1, minor = 5, patch = 1 }
+            ]
+        ]
