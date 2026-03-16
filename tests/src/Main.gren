@@ -24,7 +24,7 @@ import Test.Compiler.Parse.Module
 main : TestRunner.Program
 main =
     TestRunner.run <|
-        Test.describe "Gren Compiler Node tests"
+        Test.describe "gren-lang/compiler-common tests"
             [ Test.SemanticVersion.tests
             , Test.SemanticVersionRange.tests
             , Test.Compiler.Dependencies.tests
