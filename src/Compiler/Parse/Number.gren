@@ -8,16 +8,30 @@ module Compiler.Parse.Number exposing
     )
 
 
+{-| This module provides parsers for Gren numeric literals.
+
+@docs parser, Outcome, Error, errorToString
+
+## Specialized parsers
+
+@docs zeroOrHigher, hexParser
+-}
+
+
 import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Parse.Context exposing (Context)
 
 
+{-| The `parser` tolerates different kind of numbers: integers, floats and hex-encoded integers.
+-}
 type Outcome
     = Integer Int
     | FloatingPoint Float
     | Hex Int
 
 
+{-| The kind of errors that can happen while parsing numbers.
+-}
 type Error
     = NotANumber
     | LeadingZero
@@ -25,6 +39,8 @@ type Error
     | ExpectedHex
 
 
+{-| Returns a human-readable description of an `Error`.
+-}
 errorToString : Error -> String
 errorToString error =
     when error is
@@ -41,6 +57,10 @@ errorToString error =
             "Expected hexadecimal digits"
 
 
+{-| Use this to parse numeric literals.
+
+    Parser.run Number.parser Context.empty source
+-}
 parser : Parser Context Error Outcome
 parser =
     Parser.oneOf
@@ -70,6 +90,8 @@ parser =
             )
 
 
+{-| Like `parser`, but does not support negative numbers.
+-}
 zeroOrHigher : Parser Context Error Outcome
 zeroOrHigher =
     Parser.oneOf
@@ -121,6 +143,8 @@ fractalParser str =
                         Parser.succeed (FloatingPoint float)
             )
 
+{-| A parser that only parses hex-encoded integers, like 0xAB.
+-}
 hexParser : error -> Parser Context error Int
 hexParser err =
     Parser.chompIf Char.isHexDigit err

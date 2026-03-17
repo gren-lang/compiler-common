@@ -30,15 +30,24 @@ module Compiler.Ast.Source exposing
     , BinopAssociativity (..)
     )
 
+{-| The Abstract Syntax Tree (AST) of Gren.
+
+@docs Expression, Expression_, VarType, IfBranch, WhenBranch, RecordField, Def, DefineRecord, Pattern, Pattern_, PRecordField, Type, Type_, TRecordField, Alias, Union, UnionVariant, Value, Port, Module, ModuleDeclaration, Exposing, Exposed, Privacy, Import, Effects, Manager, Infix, BinopAssociativity
+
+-}
 
 import SourcePosition
 import Compiler.Parse.Number as Number
 
 
+{-|
+-}
 type alias Expression =
     SourcePosition.Located Expression_
 
 
+{-|
+-}
 type Expression_
   = CharLiteral Char
   | StringLiteral String
@@ -93,23 +102,31 @@ type Expression_
   | Parens Expression
 
 
+{-|
+-}
 type VarType
     = LowVar
     | CapVar
 
 
+{-|
+-}
 type alias IfBranch =
     { test : Expression
     , body : Expression
     }
 
 
+{-|
+-}
 type alias WhenBranch =
     { pattern : Pattern
     , body : Expression
     }
 
 
+{-|
+-}
 type alias RecordField =
     { field : SourcePosition.Located String
     , value : Expression
@@ -119,6 +136,8 @@ type alias RecordField =
 -- DEFINITIONS
 
 
+{-|
+-}
 type Def
   = Define DefineRecord
   | Destruct
@@ -127,6 +146,8 @@ type Def
     }
 
 
+{-|
+-}
 type alias DefineRecord =
     { name : SourcePosition.Located String
     , args : Array Pattern
@@ -137,11 +158,14 @@ type alias DefineRecord =
 
 -- PATTERN
 
-
+{-|
+-}
 type alias Pattern
     = SourcePosition.Located Pattern_
 
 
+{-|
+-}
 type Pattern_
   = PAnything String
   | PVar String
@@ -169,6 +193,8 @@ type Pattern_
     }
 
 
+{-|
+-}
 type alias PRecordField =
     { field : SourcePosition.Located String
     , pattern : Maybe Pattern
@@ -177,11 +203,14 @@ type alias PRecordField =
 
 -- TYPE
 
-
+{-|
+-}
 type alias Type =
     SourcePosition.Located Type_
 
 
+{-|
+-}
 type Type_
   = TLambda
     { from : Type
@@ -205,6 +234,8 @@ type Type_
   | TParens Type
 
 
+{-|
+-}
 type alias TRecordField =
     { field : SourcePosition.Located String
     , signature : Type
@@ -213,7 +244,8 @@ type alias TRecordField =
 
 -- Declarations
 
-
+{-|
+-}
 type alias Alias =
   { name : SourcePosition.Located String
   , vars : Array (SourcePosition.Located String)
@@ -221,6 +253,8 @@ type alias Alias =
   }
 
 
+{-|
+-}
 type alias Union =
   { name : SourcePosition.Located String
   , vars : Array (SourcePosition.Located String)
@@ -228,12 +262,16 @@ type alias Union =
   }
 
 
+{-|
+-}
 type alias UnionVariant =
   { name : SourcePosition.Located String
   , payload : Maybe Type
   }
 
 
+{-|
+-}
 type alias Value =
   { name : SourcePosition.Located String
   , signature : Maybe Type
@@ -242,6 +280,8 @@ type alias Value =
   }
 
 
+{-|
+-}
 type alias Port =
   { name : SourcePosition.Located String
   , signature : Type
@@ -250,7 +290,8 @@ type alias Port =
 
 -- Module
 
-
+{-|
+-}
 type alias Module =
   { name : SourcePosition.Located String
   , exports : Exposing
@@ -264,6 +305,8 @@ type alias Module =
   }
 
 
+{-|
+-}
 type alias ModuleDeclaration v =
   SourcePosition.Located
     { docs : Maybe (SourcePosition.Located String)
@@ -271,22 +314,30 @@ type alias ModuleDeclaration v =
     }
 
 
+{-|
+-}
 type Exposing
   = Open
   | Explicit (Array Exposed)
 
 
+{-|
+-}
 type Exposed
   = ExposedLower (SourcePosition.Located String)
   | ExposedUpper { name : SourcePosition.Located String, privacy : Privacy }
   | ExposedOperator (SourcePosition.Located String)
 
 
+{-|
+-}
 type Privacy
   = Public
   | Private
 
 
+{-|
+-}
 type alias Import =
   { module_ : SourcePosition.Located String
   , alias : Maybe String
@@ -294,18 +345,24 @@ type alias Import =
   }
 
 
+{-|
+-}
 type Effects
   = NoEffects
   | Ports (Array (ModuleDeclaration Port))
   | Manager Manager
 
 
+{-|
+-}
 type Manager
   = Cmd (SourcePosition.Located String)
   | Sub (SourcePosition.Located String)
   | Fx { cmd : SourcePosition.Located String, sub : SourcePosition.Located String }
   
 
+{-|
+-}
 type alias Infix =
   { fn : String
   , symbol : String
@@ -314,6 +371,8 @@ type alias Infix =
   }
 
 
+{-|
+-}
 type BinopAssociativity
   = OpALeft
   | OpANone

@@ -11,18 +11,32 @@ module Compiler.Parse.Variable exposing
     )
 
 
+{-| This module provides parsers for Gren variables and identifiers.
+
+@docs lowerCase, reservedWords, upperCase, foreignUpper, foreignVar, ForeignVar, foreignVarToString
+
+## Errors
+
+@docs Error, errorToString
+-}
+
+
 import String.Parser.Advanced as Parser exposing (Parser)
 import String.Regex as Regex exposing (Regex)
 import Set exposing (Set)
 import Compiler.Parse.Context exposing (Context)
 
 
+{-| The kind of errors that can happen while parsing variables.
+-}
 type Error
     = InvalidCharacter
     | ExpectedDot
     | ReservedWord String
 
 
+{-| Returns a human-readable description of an `Error`.
+-}
 errorToString : Error -> String
 errorToString error =
     when error is
@@ -36,6 +50,11 @@ errorToString error =
             "Reserved word used as variable: '" ++ word ++ "'"
 
 
+{-| Use this to parse lowercase variable names. It will fail if the variable
+is one of the reserved words.
+
+    Parser.run Variable.lowerCase Context.empty source
+-}
 lowerCase : Parser Context Error String
 lowerCase =
     -- TODO: simply stops parsing at invalid character, in lack of better alternatives
@@ -57,6 +76,9 @@ lowerCase =
         |> Parser.backtrackable
 
 
+{-| Words which successfully parses as variables, but which are reserved by the
+language spec. This includes words like `if`, `when`, `import` etc.
+-}
 reservedWords : Set String
 reservedWords =
     Set.fromArray
@@ -77,6 +99,10 @@ reservedWords =
         ]
 
 
+{-| Use this to parse uppercase variable names (like type constructors).
+
+    Parser.run Variable.upperCase Context.empty source
+-}
 upperCase : Parser Context Error String
 upperCase =
     Parser.succeed {}
@@ -85,11 +111,16 @@ upperCase =
         |> Parser.getChompedString
 
 
+{-| The result of using a `foreign*` parser. Sometimes you will get an actual
+foreign (qualified) var. Sometimes you just get an upper-case identifier.
+-}
 type ForeignVar
     = Unqualified String
     | Qualified { module_ : String, name : String }
 
 
+{-| Convert a foreign variable to its string representation.
+-}
 foreignVarToString : ForeignVar -> String
 foreignVarToString fv =
     when fv is
@@ -100,6 +131,10 @@ foreignVarToString fv =
             module_ ++ "." ++ name
 
 
+{-| Use this to parse foreign uppercase variables (like `Maybe.Just`).
+
+    Parser.run Variable.foreignUpper Context.empty source
+-}
 foreignUpper : Parser Context Error ForeignVar
 foreignUpper =
     upperCase
@@ -140,6 +175,10 @@ foreignUpperLoop acc =
         ]
 
 
+{-| Use this to parse foreign variables (like `List.map` or `Maybe.Just`).
+
+    Parser.run Variable.foreignVar Context.empty source
+-}
 foreignVar : Parser Context Error ForeignVar
 foreignVar =
     upperCase

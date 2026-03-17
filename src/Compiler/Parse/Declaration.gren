@@ -8,6 +8,12 @@ module Compiler.Parse.Declaration exposing
     )
 
 
+{-| This module provides parsers for Gren declarations (values, types, etc.).
+
+@docs Declaration, DeclarationValue, parser, docParser, Error, errorToString
+-}
+
+
 import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Ast.Source as AST
 import SourcePosition
@@ -19,12 +25,17 @@ import Compiler.Parse.Expression as Expr
 import Compiler.Parse.Context exposing (Context)
 
 
+{-| A `Declaration` is a top-level definition in a module. Like type- or
+function definitions. Each declaration can have a documentation comment.
+-}
 type alias Declaration =
     { docs : Maybe (SourcePosition.Located String)
     , value : DeclarationValue
     }
 
 
+{-| The actual declaration, without documentation comment.
+-}
 type DeclarationValue
     = Alias AST.Alias
     | Union AST.Union
@@ -32,6 +43,8 @@ type DeclarationValue
     | Port AST.Port
 
 
+{-| The kind of errors that can happen while parsing declarations.
+-}
 type Error
     = ExpectedKeyword String
     | ExpectedChar Char
@@ -42,6 +55,8 @@ type Error
     | IndentationError
 
 
+{-| Returns a human-readable description of an `Error`.
+-}
 errorToString : Error -> String
 errorToString error =
     when error is
@@ -72,6 +87,10 @@ spaceParser =
     Parser.mapError SpaceError Space.parser
 
 
+{-| Use this to parse declarations.
+
+    Parser.run Declaration.parser Context.empty source
+-}
 parser : Parser Context Error Declaration
 parser =
     Parser.succeed
@@ -100,6 +119,10 @@ parser =
             )
 
 
+{-| Use this to parse documentation comments.
+
+    Parser.run (Declaration.docParser ExpectedKeyword) Context.empty source
+-}
 docParser : (String -> err) -> Parser Context err (Maybe (SourcePosition.Located String))
 docParser toErr =
     let

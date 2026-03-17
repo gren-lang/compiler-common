@@ -1,9 +1,15 @@
 module Compiler.Parse.Module exposing
     ( Error (..)
     , parser
-    , errorsToString
     , errorToString
+    , errorsToString
     )
+
+
+{-| This will let you parse entire modules of Gren code.
+
+@docs parser, Error, errorToString, errorsToString
+-}
 
 
 import String.Parser.Advanced as Parser exposing (Parser)
@@ -18,6 +24,8 @@ import Compiler.Parse.Declaration as Declaration exposing (Declaration)
 import Compiler.Parse.Context exposing (Context)
 
 
+{-| The kind of errors that can happen while parsing Gren modules.
+-}
 type Error
     = ExpectedKeyword String
     | ExpectedChar Char
@@ -29,6 +37,8 @@ type Error
     | ExpectedEnd
 
 
+{-| Returns a human-readable description of an `Error`.
+-}
 errorToString : Error -> String
 errorToString error =
     when error is
@@ -62,6 +72,10 @@ spaceParser =
     Parser.mapError SpaceError Space.parser
 
 
+{-| Use this to parse an entire module (file) of Gren code.
+
+    Parser.run PM.parser Context.empty source
+-}
 parser : Parser Context Error AST.Module
 parser =
     Parser.succeed
@@ -522,6 +536,20 @@ declarationToModulePort decl =
 -- ERROR
 
 
+{-| Use this when parsing fails to give the user a good idea
+of where the parser failed, and why.
+
+    import Compiler.Parse.Module as PM
+    import Compiler.Parser.Context as Context
+    import String.Parser.Advanced as Parser
+
+    when Parser.run PM.parser Context.empty source is
+        Ok _ -> 
+            "Parsed OK"
+
+        Err errs ->
+            PM.errorsToString source errs 
+-}
 errorsToString : String -> Array (Parser.DeadEnd Context Error) -> String
 errorsToString src deadEnds =
   String.join "" <|

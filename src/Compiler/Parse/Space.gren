@@ -7,11 +7,23 @@ module Compiler.Parse.Space exposing
     )
 
 
+{-| This module provides parsers for whitespace and comments in Gren code.
+
+@docs parser, Error, errorToString
+
+## Indentation helpers
+
+@docs scopeIndentToLineStart, checkIndent
+-}
+
+
 import Compiler.Parse.Context as Context exposing (Context)
 import String.Parser.Advanced as Parser exposing (Parser)
 import Dict
 
 
+{-| The kind of errors that can happen while parsing whitespace and comments.
+-}
 type Error
     = ExpectedLineComment
     | ExpectedMultiLineOpen
@@ -19,6 +31,8 @@ type Error
     | InvalidWhiteSpace
 
 
+{-| Returns a human-readable description of an `Error`.
+-}
 errorToString : Error -> String
 errorToString error =
     when error is
@@ -35,6 +49,11 @@ errorToString error =
             "Invalid whitespace character"
 
 
+{-| Use this to parse whitespace and comments.
+This will change `lineStart` and `comments` fields of `Context`.
+
+    Parser.run Space.parser Context.empty source
+-}
 parser : Parser Context Error {}
 parser =
     Parser.succeed (\startPos endPos -> { startPos = startPos, endPos = endPos })
@@ -141,6 +160,9 @@ validWhiteSpace char =
     char == ' ' || char == '\n' || char == '\r'
 
 
+{-| This will set `Context.indent` to be ´Context.startLine` for the duration of
+the provided parser.
+-}
 scopeIndentToLineStart : Parser Context e v -> Parser Context e v
 scopeIndentToLineStart p =
     Parser.scopedUpdatePayload
@@ -150,6 +172,11 @@ scopeIndentToLineStart p =
         p
     
 
+{-| Use this to check that the current indentation is valid. That is, the current
+column has to be greater than `Context.indent`.
+
+This allows you to stop parsing when the indentation level decreases.
+-}
 checkIndent : Parser Context {} {}
 checkIndent =
     Parser.succeed (\indent col -> { indent = indent, col = col })

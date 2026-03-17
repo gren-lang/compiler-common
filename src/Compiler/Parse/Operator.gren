@@ -5,11 +5,19 @@ module Compiler.Parse.Operator exposing
   )
 
 
+{-| This module provides parsers for Gren operators.
+
+@docs parser, Error, errorToString
+-}
+
+
 import Set exposing (Set)
 import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Parse.Context exposing (Context)
 
 
+{-| The kind of errors that can happen while parsing operators.
+-}
 type Error
     = BadDot
     | BadPipe
@@ -19,6 +27,8 @@ type Error
     | BadOperatorCharacter
 
 
+{-| Returns a human-readable description of an `Error`.
+-}
 errorToString : Error -> String
 errorToString error =
     when error is
@@ -41,6 +51,10 @@ errorToString error =
             "Invalid operator character"
 
 
+{-| Use this to parse operators.
+
+    Parser.run Operator.parser Context.empty source
+-}
 parser : Parser Context Error String
 parser =
     Parser.succeed (String.join "")

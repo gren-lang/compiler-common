@@ -1,14 +1,33 @@
 module Compiler.Parse.Context exposing
     ( Context
+    --
     , empty
     , Comment
     , CommentValue (..)
     )
 
 
+{-| This module defines the data which can be inferred
+from a Gren source file during parsing, but which won't end up
+in the resulting AST. This includes the current indentation
+level while parsing, and the comments picked up along the way.
+
+The reason we store comments is that they're useful when formatting
+or generating code.
+
+@docs Context, empty, Comment, CommentValue
+
+-}
+
 import Dict exposing (Dict)
 
 
+{-| The "hidden" state of a parser when parsing Gren code.
+
+* `indent` - the current indentation level
+* `lineStart` - the first non-whitespace character on the current line
+* `comments` - comments we've parsed from the source code
+-}
 type alias Context =
     { indent : Int
     , lineStart : Int
@@ -16,6 +35,8 @@ type alias Context =
     }
 
 
+{-| The initial `Context`. Use this to start parsing.
+-}
 empty : Context
 empty =
     { indent = 1
@@ -24,6 +45,8 @@ empty =
     }
 
 
+{-| A comment along with it's start position in the file.
+-}
 type alias Comment =
     { row : Int
     , col : Int
@@ -31,6 +54,8 @@ type alias Comment =
     }
 
 
+{-| There are two types of comments. Line- and block-comments.
+-}
 type CommentValue
     = Line String
     | Block String

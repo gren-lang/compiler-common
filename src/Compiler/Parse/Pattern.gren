@@ -5,6 +5,12 @@ module Compiler.Parse.Pattern exposing
     )
 
 
+{-| This module provides parsers for Gren patterns.
+
+@docs parser, Error, errorToString
+-}
+
+
 import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Ast.Source as AST
 import SourcePosition
@@ -16,6 +22,8 @@ import Compiler.Parse.Number as Number
 import Compiler.Parse.Context exposing (Context)
 
 
+{-| The kind of errors that can happen while parsing patterns.
+-}
 type Error
     = ExpectedChar Char
     | ExpectedKeyword String
@@ -26,6 +34,8 @@ type Error
     | SpaceError Space.Error
 
 
+{-| Returns a human-readable description of an `Error`.
+-}
 errorToString : Error -> String
 errorToString error =
     when error is
@@ -51,8 +61,10 @@ errorToString error =
             Space.errorToString spaceError
 
 
+{-| Use this to parse patterns.
 
-
+    Parser.run Pattern.parser Context.empty source
+-}
 parser : Parser Context Error AST.Pattern
 parser =
     Parser.succeed

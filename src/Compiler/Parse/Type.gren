@@ -5,6 +5,12 @@ module Compiler.Parse.Type exposing
     )
 
 
+{-| This module provides parsers for Gren type expressions.
+
+@docs expression, Error, errorToString
+-}
+
+
 import Compiler.Parse.Context exposing (Context)
 import String.Parser.Advanced as Parser exposing (Parser)
 import SourcePosition
@@ -13,6 +19,8 @@ import Compiler.Parse.Variable as Variable
 import Compiler.Parse.Space as Space
 
 
+{-| The kind of errors that can happen while parsing types.
+-}
 type Error
     = ExpectedChar Char
     | ExpectedString String
@@ -21,6 +29,8 @@ type Error
     | SpaceError Space.Error
 
 
+{-| Returns a human-readable description of an `Error`.
+-}
 errorToString : Error -> String
 errorToString error =
     when error is
@@ -45,6 +55,10 @@ spaceParser =
     Parser.mapError SpaceError Space.parser
 
 
+{-| Use this to parse type expressions.
+
+    Parser.run Type.expression Context.empty source
+-}
 expression : Parser Context Error AST.Type
 expression =
     Parser.oneOf

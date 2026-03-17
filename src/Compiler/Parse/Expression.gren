@@ -6,6 +6,12 @@ module Compiler.Parse.Expression exposing
     )
 
 
+{-| This module provides parsers for Gren expressions.
+
+@docs parser, Error, errorToString, letDefNamedParser
+-}
+
+
 import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Ast.Source as AST
 import SourcePosition
@@ -20,6 +26,8 @@ import Set exposing (Set)
 import Compiler.Parse.Context exposing (Context)
 
 
+{-| The kind of errors that can happen while parsing expressions.
+-}
 type Error
     = ExpectedChar Char
     | ExpectedKeyword String
@@ -39,6 +47,8 @@ type Error
     | InternalError
 
 
+{-| Returns a human-readable description of an `Error`.
+-}
 errorToString : Error -> String
 errorToString error =
     when error is
@@ -91,6 +101,10 @@ errorToString error =
             "Internal parser error"
 
 
+{-| Use this to parse expressions.
+
+    Parser.run Expression.parser Context.empty source
+-}
 parser : Parser Context Error AST.Expression
 parser =
     Parser.oneOf
@@ -280,6 +294,10 @@ letDefParser =
         |> Space.scopeIndentToLineStart
 
 
+{-| Use this to parse named let definitions.
+
+    Parser.run Expression.letDefNamedParser Context.empty source
+-}
 letDefNamedParser : Parser Context Error (SourcePosition.Located AST.DefineRecord)
 letDefNamedParser =
     Parser.succeed identity
