@@ -59,7 +59,7 @@ errorToString error =
 
 {-| Use this to parse numeric literals.
 
-    Parser.run Number.parser Context.empty source
+    String.Parser.run parser Compiler.Parse.Context.empty source
 -}
 parser : Parser Context Error Outcome
 parser =
@@ -143,7 +143,7 @@ fractalParser str =
                         Parser.succeed (FloatingPoint float)
             )
 
-{-| A parser that only parses hex-encoded integers, like 0xAB.
+{-| A parser that only parses hex-encoded integers, like `0xAB`.
 -}
 hexParser : error -> Parser Context error Int
 hexParser err =

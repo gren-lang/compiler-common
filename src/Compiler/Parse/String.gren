@@ -62,7 +62,7 @@ errorToString error =
 
 {-| Use this to parse character literals.
 
-    Parser.run String.char Context.empty source
+    String.Parser.run char Compiler.Parse.Context.empty source
 -}
 char : Parser Context Error Char
 char =
@@ -154,7 +154,7 @@ crlf =
 
 {-| Use this to parse string literals.
 
-    Parser.run String.string Context.empty source
+    String.Parser.run string Compiler.Parse.Context.empty source
 -}
 string : Parser Context Error String
 string =

@@ -11,7 +11,7 @@ module Compiler.ModuleName exposing
 
 @docs ModuleName
 
-## Constructors
+## Conversions
 
 @docs fromString, jsonDecoder
 
@@ -24,13 +24,14 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 
 
-{-|-}
+{-| A valid module name like `Module.Name`.
+-}
 type ModuleName
     = ModuleName String
 
 
 {-| Construct a [ModuleName](#ModuleName) from a `String`. Will return `Nothing`
-if the `String` doesn't represent a valid [ModuleName](#ModuleName).
+if the `String` doesn't represent a valid module name.
 -}
 fromString : String -> Maybe ModuleName
 fromString str =

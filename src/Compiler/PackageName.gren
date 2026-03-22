@@ -156,19 +156,22 @@ toJson package =
     Json.string <| toString package
 
 
-{-| -}
+{-| `gren-lang/core`
+-}
 core : PackageName
 core =
     PackageName { author = "gren-lang", name = "core" }
 
 
-{-| -}
+{-| `gren-lang/browser`
+-}
 browser : PackageName
 browser =
     PackageName { author = "gren-lang", name = "browser" }
 
 
-{-| -}
+{-| `gren-lang/node`
+-}
 node : PackageName
 node =
     PackageName { author = "gren-lang", name = "node" }

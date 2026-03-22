@@ -74,7 +74,7 @@ spaceParser =
 
 {-| Use this to parse an entire module (file) of Gren code.
 
-    Parser.run PM.parser Context.empty source
+    String.Parser.run parser Compiler.Parse.Context.empty source
 -}
 parser : Parser Context Error AST.Module
 parser =

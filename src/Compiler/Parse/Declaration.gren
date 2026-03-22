@@ -89,7 +89,7 @@ spaceParser =
 
 {-| Use this to parse declarations.
 
-    Parser.run Declaration.parser Context.empty source
+    String.Parser.run parser Compiler.Parse.Context.empty source
 -}
 parser : Parser Context Error Declaration
 parser =
@@ -121,7 +121,7 @@ parser =
 
 {-| Use this to parse documentation comments.
 
-    Parser.run (Declaration.docParser ExpectedKeyword) Context.empty source
+    String.Parser.run (docParser ExpectedKeyword) Compiler.Parse.Context.empty source
 -}
 docParser : (String -> err) -> Parser Context err (Maybe (SourcePosition.Located String))
 docParser toErr =

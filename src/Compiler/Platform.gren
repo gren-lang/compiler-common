@@ -21,8 +21,7 @@ import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
 
 
-{-| The platform targetted by a project. You'll read this value
-from a gren.json file.
+{-| You'll find this value in `gren.json`
 -}
 type Platform
     = Node

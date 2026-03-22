@@ -53,7 +53,7 @@ errorToString error =
 
 {-| Use this to parse operators.
 
-    Parser.run Operator.parser Context.empty source
+    String.Parser.run parser Compiler.Parse.Context.empty source
 -}
 parser : Parser Context Error String
 parser =

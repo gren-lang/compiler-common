@@ -53,7 +53,7 @@ errorToString error =
 {-| Use this to parse lowercase variable names. It will fail if the variable
 is one of the reserved words.
 
-    Parser.run Variable.lowerCase Context.empty source
+    String.Parser.run lowerCase Compiler.Parse.Context.empty source
 -}
 lowerCase : Parser Context Error String
 lowerCase =
@@ -101,7 +101,7 @@ reservedWords =
 
 {-| Use this to parse uppercase variable names (like type constructors).
 
-    Parser.run Variable.upperCase Context.empty source
+    String.Parser.run upperCase Compiler.Parse.Context.empty source
 -}
 upperCase : Parser Context Error String
 upperCase =
@@ -133,7 +133,7 @@ foreignVarToString fv =
 
 {-| Use this to parse foreign uppercase variables (like `Maybe.Just`).
 
-    Parser.run Variable.foreignUpper Context.empty source
+    String.Parser.run foreignUpper Compiler.Parse.Context.empty source
 -}
 foreignUpper : Parser Context Error ForeignVar
 foreignUpper =
@@ -177,7 +177,7 @@ foreignUpperLoop acc =
 
 {-| Use this to parse foreign variables (like `List.map` or `Maybe.Just`).
 
-    Parser.run Variable.foreignVar Context.empty source
+    String.Parser.run foreignVar Compiler.Parse.Context.empty source
 -}
 foreignVar : Parser Context Error ForeignVar
 foreignVar =

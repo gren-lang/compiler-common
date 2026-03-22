@@ -63,7 +63,7 @@ errorToString error =
 
 {-| Use this to parse patterns.
 
-    Parser.run Pattern.parser Context.empty source
+    String.Parser.run parser Compiler.Parse.Context.empty source
 -}
 parser : Parser Context Error AST.Pattern
 parser =

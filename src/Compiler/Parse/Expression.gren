@@ -103,7 +103,7 @@ errorToString error =
 
 {-| Use this to parse expressions.
 
-    Parser.run Expression.parser Context.empty source
+    String.Parser.run parser Compiler.Parse.Context.empty source
 -}
 parser : Parser Context Error AST.Expression
 parser =
@@ -296,7 +296,7 @@ letDefParser =
 
 {-| Use this to parse named let definitions.
 
-    Parser.run Expression.letDefNamedParser Context.empty source
+    String.Parser.run letDefNamedParser Compiler.Parse.Context.empty source
 -}
 letDefNamedParser : Parser Context Error (SourcePosition.Located AST.DefineRecord)
 letDefNamedParser =

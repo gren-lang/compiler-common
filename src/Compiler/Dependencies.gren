@@ -7,7 +7,7 @@ module Compiler.Dependencies exposing
 
 {-| The algorithm for calculating the required dependencies of a project.
 
-@docs SimplifiedOutline, Solution, solve
+@docs SimplifiedOutline, solve, Solution
 -}
 
 import Compiler.PackageName as PackageName exposing (PackageName)
@@ -25,7 +25,7 @@ type alias SimplifiedOutline =
     }
 
 
-{-| Return value of [solve](#solve). Let's you know if you've got all the required dependencies,
+{-| Let's you know if you've got all the required dependencies,
 or if you're missing something.
 -}
 type Solution

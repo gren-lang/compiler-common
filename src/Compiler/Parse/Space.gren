@@ -52,7 +52,7 @@ errorToString error =
 {-| Use this to parse whitespace and comments.
 This will change `lineStart` and `comments` fields of `Context`.
 
-    Parser.run Space.parser Context.empty source
+    String.Parser.run parser Compiler.Parse.Context.empty source
 -}
 parser : Parser Context Error {}
 parser =

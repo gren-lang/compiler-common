@@ -57,7 +57,7 @@ spaceParser =
 
 {-| Use this to parse type expressions.
 
-    Parser.run Type.expression Context.empty source
+    String.Parser.run expression Compiler.Parse.Context.empty source
 -}
 expression : Parser Context Error AST.Type
 expression =
