@@ -30,6 +30,6 @@
     ],
     "gren-version": "0.6.0 <= v < 0.7.0",
     "dependencies": {
-        "gren-lang/core": "local:../core"
+        "gren-lang/core": "7.4.0 <= v < 8.0.0"
     }
 }
