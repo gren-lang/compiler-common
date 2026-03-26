@@ -301,7 +301,6 @@ type alias ValueSignature =
 -}
 type alias TypeSignature =
   { name : SourcePosition.Located String
-  , signature : Type
   }
 
 
@@ -345,7 +344,7 @@ type alias ModuleSignature =
   , docs : Maybe (SourcePosition.Located String)
   , imports : Array (SourcePosition.Located Import)
   , values : Array (ModuleDeclaration ValueSignature)
-  , unions : Array (ModuleDeclaration TypeSignature)
+  , types : Array (ModuleDeclaration TypeSignature)
   }
 
 

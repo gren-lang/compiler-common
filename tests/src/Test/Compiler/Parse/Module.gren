@@ -1087,6 +1087,123 @@ tests =
                         ]
                     }
                 )
+         , test "Signature module" <| \_ ->
+             Parser.run PM.parser Context.empty
+                 """
+                 signature module Comparable
+
+                 import Basics
+
+                 type T
+
+                 compare : T -> T -> Basics.Order
+                 """
+                 |> expect
+                     (AST.Signature
+                         { name =
+                             SourcePosition.at
+                                 { row = 1, col = 18 }
+                                 { row = 1, col = 28 }
+                                 "Comparable"
+                         , docs = Nothing
+                         , imports =
+                            [ SourcePosition.at
+                                { row = 3, col = 1 }
+                                { row = 3, col = 14 }
+                                { module_ =
+                                    SourcePosition.at
+                                        { row = 3, col = 8 }
+                                        { row = 3, col = 14 }
+                                        "Basics"
+                                , args = []
+                                , alias = Nothing
+                                , expose = AST.Explicit []
+                                }
+                            ]
+                         , values =
+                            [ SourcePosition.at
+                                { row = 7, col = 1 }
+                                { row = 7, col = 33 }
+                                { docs = Nothing
+                                , value =
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 7, col = 1 }
+                                            { row = 7, col = 8 }
+                                            "compare"
+                                    , signature =
+                                        SourcePosition.at
+                                            { row = 7, col = 11 }
+                                            { row = 7, col = 33 }
+                                            (AST.TLambda
+                                                { from =
+                                                    SourcePosition.at
+                                                        { row = 7, col = 11 }
+                                                        { row = 7, col = 12 }
+                                                        (AST.TType
+                                                            { name =
+                                                                SourcePosition.at
+                                                                    { row = 7, col = 11 }
+                                                                    { row = 7, col = 12 }
+                                                                    "T"
+                                                            , args = []
+                                                            }
+                                                        )
+                                                , to =
+                                                    SourcePosition.at
+                                                        { row = 7, col = 16 }
+                                                        { row = 7, col = 33 }
+                                                        (AST.TLambda
+                                                            { from =
+                                                                SourcePosition.at
+                                                                    { row = 7, col = 16 }
+                                                                    { row = 7, col = 17 }
+                                                                    (AST.TType
+                                                                        { name =
+                                                                            SourcePosition.at
+                                                                                { row = 7, col = 16 }
+                                                                                { row = 7, col = 17 }
+                                                                                "T"
+                                                                        , args = []
+                                                                        }
+                                                                    )
+                                                            , to =
+                                                                SourcePosition.at
+                                                                    { row = 7, col = 21 }
+                                                                    { row = 7, col = 33 }
+                                                                    (AST.TTypeQual
+                                                                        { args = []
+                                                                        , name = "Order"
+                                                                        , qualifier = "Basics"
+                                                                        , varRegion =
+                                                                            { start = { row = 7, col = 21 }
+                                                                            , end = { row = 7, col = 33 }
+                                                                            }
+                                                                        }
+                                                                    )
+                                                            }
+                                                        )
+                                                }
+                                            )
+                                    }
+                                }
+                            ]
+                         , types =
+                            [ SourcePosition.at
+                                { row = 5, col = 6 }
+                                { row = 5, col = 7 }
+                                { docs = Nothing
+                                , value =
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 5, col = 6 }
+                                            { row = 5, col = 7 }
+                                            "T"
+                                    }
+                                }
+                            ]
+                        }
+                    )
         ]
 
 expect : AST.Module -> Result (Array (Parser.DeadEnd c e)) AST.Module -> Expectation
