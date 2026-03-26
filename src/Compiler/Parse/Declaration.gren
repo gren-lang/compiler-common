@@ -200,7 +200,7 @@ aliasParser =
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] typeArgLoopParser)
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.mapError TypeError Type.expression)
+        |> Parser.keep (Parser.mapError TypeError Type.parser)
 
 
 typeArgLoopParser : Array (SourcePosition.Located String) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located String)) (Array (SourcePosition.Located String)))
@@ -261,7 +261,7 @@ variantParser =
             (Parser.oneOf
                 [ Parser.succeed Just
                     |> Parser.skip (Parser.mapError (\_ -> IndentationError) Space.checkIndent)
-                    |> Parser.keep (Parser.mapError TypeError Type.expression)
+                    |> Parser.keep (Parser.mapError TypeError Type.parser)
                 , Parser.succeed Nothing
                 ]
             )
@@ -294,7 +294,7 @@ portParser =
         |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.mapError TypeError Type.expression)
+        |> Parser.keep (Parser.mapError TypeError Type.parser)
 
 
 lowerCaseVariable : Parser Context Error String

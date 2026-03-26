@@ -1,13 +1,13 @@
 module Compiler.Parse.Type exposing
     ( Error (..)
-    , expression
+    , parser
     , errorToString
     )
 
 
 {-| This module provides parsers for Gren type expressions.
 
-@docs expression, Error, errorToString
+@docs parser, Error, errorToString
 -}
 
 
@@ -55,12 +55,12 @@ spaceParser =
     Parser.mapError SpaceError Space.parser
 
 
-{-| Use this to parse type expressions.
+{-| Use this to parse type type expressions.
 
-    String.Parser.run expression Compiler.Parse.Context.empty source
+    String.Parser.run parser Compiler.Parse.Context.empty source
 -}
-expression : Parser Context Error AST.Type
-expression =
+parser : Parser Context Error AST.Type
+parser =
     Parser.oneOf
         [ app
         , term
@@ -79,7 +79,7 @@ expression =
                         |> Parser.skip (Parser.token "->" (ExpectedString "->"))
                         |> Parser.skip spaceParser
                         |> Parser.skip checkIndent
-                        |> Parser.keep (Parser.lazy (\_ -> expression))
+                        |> Parser.keep (Parser.lazy (\_ -> parser))
                     , Parser.succeed tipe
                     ]
             )
@@ -129,7 +129,7 @@ typeArgsParser array =
     Parser.oneOf
         [ Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
             |> Parser.skip (Parser.mapError (\_ -> ExpectedIndent) Space.checkIndent)
-            |> Parser.keep expression
+            |> Parser.keep parser
             |> Parser.skip spaceParser
         , Parser.succeed (Parser.Done array)
         ]
@@ -170,7 +170,7 @@ term =
                     , Parser.succeed (\expr end -> SourcePosition.at start end (AST.TParens expr))
                         |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
                         |> Parser.skip spaceParser
-                        |> Parser.keep expression
+                        |> Parser.keep parser
                         |> Parser.keep Parser.getPosition
                         |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
                     , Parser.succeed (\record end -> SourcePosition.at start end record)
@@ -211,7 +211,7 @@ recordParser =
                                 , Parser.succeed identity
                                     |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
                                     |> Parser.skip spaceParser
-                                    |> Parser.keep expression
+                                    |> Parser.keep parser
                                     |> Parser.skip spaceParser
                                     |> Parser.andThen
                                         (\expr ->
@@ -238,7 +238,7 @@ recordFieldParser =
         |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
         |> Parser.skip spaceParser
-        |> Parser.keep expression
+        |> Parser.keep parser
 
 
 innerRecordParser : Array AST.TRecordField -> Parser Context Error (Parser.Step (Array AST.TRecordField) (Array AST.TRecordField))
