@@ -26,6 +26,7 @@ tests =
                             "MyModule"
                     , exports = AST.Open
                     , docs = Nothing
+                    , requires = []
                     , imports = []
                     , values = []
                     , unions = []
@@ -74,6 +75,7 @@ tests =
                                     "view"
                             ]
                     , docs = Nothing
+                    , requires = []
                     , imports = []
                     , values = []
                     , unions = []
@@ -94,6 +96,7 @@ tests =
                             "PortModule"
                     , exports = AST.Open
                     , docs = Nothing
+                    , requires = []
                     , imports = []
                     , values = []
                     , unions = []
@@ -114,6 +117,7 @@ tests =
                             "CmdModule"
                     , exports = AST.Open
                     , docs = Nothing
+                    , requires = []
                     , imports = []
                     , values = []
                     , unions = []
@@ -140,6 +144,7 @@ tests =
                             "SubModule"
                     , exports = AST.Open
                     , docs = Nothing
+                    , requires = []
                     , imports = []
                     , values = []
                     , unions = []
@@ -166,6 +171,7 @@ tests =
                             "FxModule"
                     , exports = AST.Open
                     , docs = Nothing
+                    , requires = []
                     , imports = []
                     , values = []
                     , unions = []
@@ -206,6 +212,7 @@ tests =
                             { row = 3, col = 1 }
                             { row = 4, col = 3 }
                             " The documentation for MyModule\n"
+                    , requires = []
                     , imports = []
                     , values = []
                     , unions = []
@@ -228,6 +235,7 @@ tests =
                             "MyModule"
                     , exports = AST.Open
                     , docs = Nothing
+                    , requires = []
                     , imports =
                         [ SourcePosition.at
                             { row = 3, col = 1 }
@@ -262,6 +270,7 @@ tests =
                             "MyModule"
                     , exports = AST.Open
                     , docs = Nothing
+                    , requires = []
                     , imports =
                         [ SourcePosition.at
                             { row = 3, col = 1 }
@@ -297,6 +306,7 @@ tests =
                         "MyModule"
                 , exports = AST.Open
                 , docs = Nothing
+                , requires = []
                 , imports =
                     [ SourcePosition.at
                         { row = 3, col = 1 }
@@ -355,6 +365,7 @@ tests =
                         "MyModule"
                 , exports = AST.Open
                 , docs = Nothing
+                , requires = []
                 , imports =
                     [ SourcePosition.at
                         { row = 3, col = 1 }
@@ -392,6 +403,101 @@ tests =
                 , binops = []
                 , effects = AST.NoEffects
                 }
+        , test "requires with alias and exposing" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                require Compare
+                require String.Compare as StrC
+                require Package exposing (..)
+
+                import Array exposing (..)
+                import Nested.Module as N.M exposing (T)
+                """
+            |> expect
+                { name =
+                    SourcePosition.at
+                        { row = 1, col = 8 }
+                        { row = 1, col = 16 }
+                        "MyModule"
+                , exports = AST.Open
+                , docs = Nothing
+                , requires =
+                    [ SourcePosition.at
+                        { row = 3, col = 1 }
+                        { row = 3, col = 16 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 3, col = 9 }
+                                { row = 3, col = 16 }
+                                "Compare"
+                        , alias = Nothing
+                        , expose = AST.Explicit []
+                        }
+                    , SourcePosition.at
+                        { row = 4, col = 1 }
+                        { row = 4, col = 31 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 4, col = 9 }
+                                { row = 4, col = 23 }
+                                "String.Compare"
+                        , alias = Just "StrC"
+                        , expose = AST.Explicit []
+                        }
+                    , SourcePosition.at
+                        { row = 5, col = 1 }
+                        { row = 5, col = 30 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 5, col = 9 }
+                                { row = 5, col = 16 }
+                                "Package"
+                        , alias = Nothing
+                        , expose = AST.Open
+                        }
+                    ]
+                , imports =
+                    [ SourcePosition.at
+                        { row = 7, col = 1 }
+                        { row = 7, col = 27 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 7, col = 8 }
+                                { row = 7, col = 13 }
+                                "Array"
+                        , alias = Nothing
+                        , expose = AST.Open
+                        }
+                    , SourcePosition.at
+                        { row = 8, col = 1 }
+                        { row = 8, col = 41 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 8, col = 8 }
+                                { row = 8, col = 21 }
+                                "Nested.Module"
+                        , alias = Just "N.M"
+                        , expose =
+                            AST.Explicit
+                                [ AST.ExposedUpper
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 8, col = 39 }
+                                            { row = 8, col = 40 }
+                                            "T"
+                                    , privacy = AST.Private
+                                    }
+                                ]
+                            }
+                        ]
+                , values = []
+                , unions = []
+                , aliases = []
+                , binops = []
+                , effects = AST.NoEffects
+                }
         , test "operators" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
@@ -409,6 +515,7 @@ tests =
                             "MyModule"
                     , exports = AST.Open
                     , docs = Nothing
+                    , requires = []
                     , imports = []
                     , values = []
                     , unions = []
@@ -468,6 +575,7 @@ tests =
                              "MyValues"
                      , exports = AST.Open
                      , docs = Nothing
+                     , requires = []
                      , imports = []
                      , values =
                           [ SourcePosition.at
@@ -686,6 +794,7 @@ tests =
                             "Test"
                     , exports = AST.Open
                     , docs = Nothing
+                    , requires = []
                     , imports = []
                     , aliases = []
                     , binops = []
