@@ -300,6 +300,7 @@ type alias Module =
   { name : SourcePosition.Located String
   , exports : Exposing
   , docs : Maybe (SourcePosition.Located String)
+  , requires : Array (SourcePosition.Located Import)
   , imports : Array (SourcePosition.Located Import)
   , values : Array (ModuleDeclaration Value)
   , unions : Array (ModuleDeclaration Union)

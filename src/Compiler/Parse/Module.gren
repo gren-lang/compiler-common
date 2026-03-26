@@ -79,7 +79,7 @@ spaceParser =
 parser : Parser Context Error AST.Module
 parser =
     Parser.succeed
-        (\{ name, effects } exports docs imports binops decls ->
+        (\{ name, effects } exports docs requires imports binops decls ->
             let
                 values =
                     Array.mapAndKeepJust declarationToModuleValue decls
@@ -96,6 +96,7 @@ parser =
             { name = name
             , exports = exports
             , docs = docs
+            , requires = requires
             , imports = imports
             , values = values
             , unions = unions
@@ -141,6 +142,8 @@ parser =
         |> Parser.keep parseExposingStatement
         |> Parser.skip spaceParser
         |> Parser.keep (Declaration.docParser ExpectedKeyword)
+        |> Parser.skip spaceParser
+        |> Parser.keep (Parser.loop [] requireLoopParser)
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] importLoopParser)
         |> Parser.skip spaceParser
@@ -355,10 +358,25 @@ parseOperatorDeclaration =
         |> Parser.keep Parser.getPosition
 
 
+requireLoopParser
+    : Array (SourcePosition.Located AST.Import)
+    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located  AST.Import)) (Array (SourcePosition.Located  AST.Import)))
+requireLoopParser imps =
+    importLoopParserImpl "require" imps
+
+
 importLoopParser
     : Array (SourcePosition.Located AST.Import)
     -> Parser Context Error (Parser.Step (Array (SourcePosition.Located  AST.Import)) (Array (SourcePosition.Located  AST.Import)))
 importLoopParser imps =
+    importLoopParserImpl "import" imps
+
+
+importLoopParserImpl
+    : String
+    -> Array (SourcePosition.Located AST.Import)
+    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located  AST.Import)) (Array (SourcePosition.Located  AST.Import)))
+importLoopParserImpl importKeyword imps =
     Parser.oneOf
         [ Parser.succeed
             (\moduleName ->
@@ -370,7 +388,7 @@ importLoopParser imps =
                     , expose = AST.Explicit []
                     }
             )
-            |> Parser.skip (Parser.token "import" (ExpectedKeyword "import"))
+            |> Parser.skip (Parser.token importKeyword (ExpectedKeyword importKeyword))
             |> Parser.skip spaceParser
             |> Parser.keep moduleNameParser
             |> Parser.skip spaceParser
