@@ -19,179 +19,191 @@ tests =
                 module MyModule exposing (..)
                 """
                 |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 8 }
-                            { row = 1, col = 16 }
-                            "MyModule"
-                    , exports = AST.Open
-                    , docs = Nothing
-                    , requires = []
-                    , imports = []
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops = []
-                    , effects = AST.NoEffects
-                    }
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 8 }
+                                { row = 1, col = 16 }
+                                "MyModule"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports = []
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects = AST.NoEffects
+                        }
+                    )
         , test "Empty module with exposings (valid when parsing)" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
                 module MyModule exposing ( Model, Msg (..), (==), view )
                 """
                 |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 8 }
-                            { row = 1, col = 16 }
-                            "MyModule"
-                    , exports =
-                        AST.Explicit
-                            [ AST.ExposedUpper
-                                { name =
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 8 }
+                                { row = 1, col = 16 }
+                                "MyModule"
+                        , exports =
+                            AST.Explicit
+                                [ AST.ExposedUpper
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 1, col = 28 }
+                                            { row = 1, col = 33 }
+                                            "Model"
+                                    , privacy = AST.Private
+                                    }
+                                , AST.ExposedUpper
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 1, col = 35 }
+                                            { row = 1, col = 38 }
+                                            "Msg"
+                                    , privacy = AST.Public
+                                    }
+                                , AST.ExposedOperator <|
                                     SourcePosition.at
-                                        { row = 1, col = 28 }
-                                        { row = 1, col = 33 }
-                                        "Model"
-                                , privacy = AST.Private
-                                }
-                            , AST.ExposedUpper
-                                { name =
+                                        { row = 1, col = 46 }
+                                        { row = 1, col = 48 }
+                                        "=="
+                                , AST.ExposedLower <|
                                     SourcePosition.at
-                                        { row = 1, col = 35 }
-                                        { row = 1, col = 38 }
-                                        "Msg"
-                                , privacy = AST.Public
-                                }
-                            , AST.ExposedOperator <|
-                                SourcePosition.at
-                                    { row = 1, col = 46 }
-                                    { row = 1, col = 48 }
-                                    "=="
-                            , AST.ExposedLower <|
-                                SourcePosition.at
-                                    { row = 1, col = 51 }
-                                    { row = 1, col = 55 }
-                                    "view"
-                            ]
-                    , docs = Nothing
-                    , requires = []
-                    , imports = []
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops = []
-                    , effects = AST.NoEffects
-                    }
+                                        { row = 1, col = 51 }
+                                        { row = 1, col = 55 }
+                                        "view"
+                                ]
+                        , docs = Nothing
+                        , requires = []
+                        , imports = []
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects = AST.NoEffects
+                        }
+                    )
         , test "the port keyword is optional (going away in future release)" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
                 port module PortModule exposing (..)
                 """
                 |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 13 }
-                            { row = 1, col = 23 }
-                            "PortModule"
-                    , exports = AST.Open
-                    , docs = Nothing
-                    , requires = []
-                    , imports = []
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops = []
-                    , effects = AST.NoEffects
-                    }
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 13 }
+                                { row = 1, col = 23 }
+                                "PortModule"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports = []
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects = AST.NoEffects
+                        }
+                    )
         , test "effect module with defined cmd" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
                 effect module CmdModule where { command = MyCmd } exposing (..)
                 """
                 |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 15 }
-                            { row = 1, col = 24 }
-                            "CmdModule"
-                    , exports = AST.Open
-                    , docs = Nothing
-                    , requires = []
-                    , imports = []
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops = []
-                    , effects =
-                        SourcePosition.at
-                            { row = 1, col = 43 }
-                            { row = 1, col = 48 }
-                            "MyCmd"
-                            |> AST.Cmd
-                            |> AST.Manager
-                    }
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 15 }
+                                { row = 1, col = 24 }
+                                "CmdModule"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports = []
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects =
+                            SourcePosition.at
+                                { row = 1, col = 43 }
+                                { row = 1, col = 48 }
+                                "MyCmd"
+                                |> AST.Cmd
+                                |> AST.Manager
+                        }
+                    )
         , test "effect module with defined sub" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
                 effect module SubModule where { subscription = MySub } exposing (..)
                 """
                 |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 15 }
-                            { row = 1, col = 24 }
-                            "SubModule"
-                    , exports = AST.Open
-                    , docs = Nothing
-                    , requires = []
-                    , imports = []
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops = []
-                    , effects =
-                        SourcePosition.at
-                            { row = 1, col = 48 }
-                            { row = 1, col = 53 }
-                            "MySub"
-                            |> AST.Sub
-                            |> AST.Manager
-                    }
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 15 }
+                                { row = 1, col = 24 }
+                                "SubModule"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports = []
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects =
+                            SourcePosition.at
+                                { row = 1, col = 48 }
+                                { row = 1, col = 53 }
+                                "MySub"
+                                |> AST.Sub
+                                |> AST.Manager
+                        }
+                    )
         , test "effect module with defined fx" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
                 effect module FxModule where { command = MyCmd, subscription = MySub } exposing (..)
                 """
                 |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 15 }
-                            { row = 1, col = 23 }
-                            "FxModule"
-                    , exports = AST.Open
-                    , docs = Nothing
-                    , requires = []
-                    , imports = []
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops = []
-                    , effects =
-                        { cmd =
+                    (AST.Implementation
+                        { name =
                             SourcePosition.at
-                                { row = 1, col = 42 }
-                                { row = 1, col = 47 }
-                                "MyCmd"
-                        , sub =
-                            SourcePosition.at
-                                { row = 1, col = 64 }
-                                { row = 1, col = 69 }
-                                "MySub"
+                                { row = 1, col = 15 }
+                                { row = 1, col = 23 }
+                                "FxModule"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports = []
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects =
+                            { cmd =
+                                SourcePosition.at
+                                    { row = 1, col = 42 }
+                                    { row = 1, col = 47 }
+                                    "MyCmd"
+                            , sub =
+                                SourcePosition.at
+                                    { row = 1, col = 64 }
+                                    { row = 1, col = 69 }
+                                    "MySub"
+                            }
+                                |> AST.Fx
+                                |> AST.Manager
                         }
-                            |> AST.Fx
-                            |> AST.Manager
-                    }
+                    )
         , test "Docs" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
@@ -201,25 +213,27 @@ tests =
                 -}
                 """
                 |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 8 }
-                            { row = 1, col = 16 }
-                            "MyModule"
-                    , exports = AST.Open
-                    , docs = Just <|
-                        SourcePosition.at
-                            { row = 3, col = 1 }
-                            { row = 4, col = 3 }
-                            " The documentation for MyModule\n"
-                    , requires = []
-                    , imports = []
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops = []
-                    , effects = AST.NoEffects
-                    }
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 8 }
+                                { row = 1, col = 16 }
+                                "MyModule"
+                        , exports = AST.Open
+                        , docs = Just <|
+                            SourcePosition.at
+                                { row = 3, col = 1 }
+                                { row = 4, col = 3 }
+                                " The documentation for MyModule\n"
+                        , requires = []
+                        , imports = []
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects = AST.NoEffects
+                        }
+                    )
         , test "imports" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
@@ -228,6 +242,147 @@ tests =
                 import Array
                 """
                 |> expect
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 8 }
+                                { row = 1, col = 16 }
+                                "MyModule"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports =
+                            [ SourcePosition.at
+                                { row = 3, col = 1 }
+                                { row = 3, col = 13 }
+                                { module_ =
+                                    SourcePosition.at
+                                        { row = 3, col = 8 }
+                                        { row = 3, col = 13 }
+                                        "Array"
+                                , args = []
+                                , alias = Nothing
+                                , expose = AST.Explicit []
+                                }
+                            ]
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects = AST.NoEffects
+                        }
+                    )
+        , test "imports with alias" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array as A
+                """
+                |> expect
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 8 }
+                                { row = 1, col = 16 }
+                                "MyModule"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports =
+                            [ SourcePosition.at
+                                { row = 3, col = 1 }
+                                { row = 3, col = 18 }
+                                { module_ =
+                                    SourcePosition.at
+                                        { row = 3, col = 8 }
+                                        { row = 3, col = 13 }
+                                        "Array"
+                                , args = []
+                                , alias = Just "A"
+                                , expose = AST.Explicit []
+                                }
+                            ]
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects = AST.NoEffects
+                        }
+                    )
+        , test "imports with alias and exposing" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array exposing (..)
+                import Nested.Module as N.M exposing (T)
+                """
+            |> expect
+                (AST.Implementation
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , requires = []
+                    , imports =
+                        [ SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 3, col = 27 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 3, col = 8 }
+                                    { row = 3, col = 13 }
+                                    "Array"
+                            , args = []
+                            , alias = Nothing
+                            , expose = AST.Open
+                            }
+                        , SourcePosition.at
+                            { row = 4, col = 1 }
+                            { row = 4, col = 41 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 4, col = 8 }
+                                    { row = 4, col = 21 }
+                                    "Nested.Module"
+                            , args = []
+                            , alias = Just "N.M"
+                            , expose =
+                                AST.Explicit
+                                    [ AST.ExposedUpper
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 4, col = 39 }
+                                                { row = 4, col = 40 }
+                                                "T"
+                                        , privacy = AST.Private
+                                        }
+                                    ]
+                                }
+                            ]
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+                )
+        , test "imports end positions" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array
+  
+                import Basics exposing
+                    (max)
+                """
+            |> expect
+                (AST.Implementation
                     { name =
                         SourcePosition.at
                             { row = 1, col = 8 }
@@ -249,41 +404,24 @@ tests =
                             , alias = Nothing
                             , expose = AST.Explicit []
                             }
-                        ]
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops = []
-                    , effects = AST.NoEffects
-                    }
-        , test "imports with alias" <| \_ ->
-            Parser.run PM.parser Context.empty
-                """
-                module MyModule exposing (..)
-
-                import Array as A
-                """
-                |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 8 }
-                            { row = 1, col = 16 }
-                            "MyModule"
-                    , exports = AST.Open
-                    , docs = Nothing
-                    , requires = []
-                    , imports =
-                        [ SourcePosition.at
-                            { row = 3, col = 1 }
-                            { row = 3, col = 18 }
+                        , SourcePosition.at
+                            { row = 5, col = 1 }
+                            { row = 6, col = 10 }
                             { module_ =
                                 SourcePosition.at
-                                    { row = 3, col = 8 }
-                                    { row = 3, col = 13 }
-                                    "Array"
+                                    { row = 5, col = 8 }
+                                    { row = 5, col = 14 }
+                                    "Basics"
                             , args = []
-                            , alias = Just "A"
-                            , expose = AST.Explicit []
+                            , alias = Nothing
+                            , expose =
+                                AST.Explicit
+                                    [ AST.ExposedLower <|
+                                        SourcePosition.at
+                                            { row = 6, col = 6 }
+                                            { row = 6, col = 9 }
+                                            "max"
+                                    ]
                             }
                         ]
                     , values = []
@@ -291,124 +429,8 @@ tests =
                     , aliases = []
                     , binops = []
                     , effects = AST.NoEffects
-                    }
-        , test "imports with alias and exposing" <| \_ ->
-            Parser.run PM.parser Context.empty
-                """
-                module MyModule exposing (..)
-
-                import Array exposing (..)
-                import Nested.Module as N.M exposing (T)
-                """
-            |> expect
-                { name =
-                    SourcePosition.at
-                        { row = 1, col = 8 }
-                        { row = 1, col = 16 }
-                        "MyModule"
-                , exports = AST.Open
-                , docs = Nothing
-                , requires = []
-                , imports =
-                    [ SourcePosition.at
-                        { row = 3, col = 1 }
-                        { row = 3, col = 27 }
-                        { module_ =
-                            SourcePosition.at
-                                { row = 3, col = 8 }
-                                { row = 3, col = 13 }
-                                "Array"
-                        , args = []
-                        , alias = Nothing
-                        , expose = AST.Open
-                        }
-                    , SourcePosition.at
-                        { row = 4, col = 1 }
-                        { row = 4, col = 41 }
-                        { module_ =
-                            SourcePosition.at
-                                { row = 4, col = 8 }
-                                { row = 4, col = 21 }
-                                "Nested.Module"
-                        , args = []
-                        , alias = Just "N.M"
-                        , expose =
-                            AST.Explicit
-                                [ AST.ExposedUpper
-                                    { name =
-                                        SourcePosition.at
-                                            { row = 4, col = 39 }
-                                            { row = 4, col = 40 }
-                                            "T"
-                                    , privacy = AST.Private
-                                    }
-                                ]
-                            }
-                        ]
-                , values = []
-                , unions = []
-                , aliases = []
-                , binops = []
-                , effects = AST.NoEffects
                 }
-        , test "imports end positions" <| \_ ->
-            Parser.run PM.parser Context.empty
-                """
-                module MyModule exposing (..)
-
-                import Array
-  
-                import Basics exposing
-                    (max)
-                """
-            |> expect
-                { name =
-                    SourcePosition.at
-                        { row = 1, col = 8 }
-                        { row = 1, col = 16 }
-                        "MyModule"
-                , exports = AST.Open
-                , docs = Nothing
-                , requires = []
-                , imports =
-                    [ SourcePosition.at
-                        { row = 3, col = 1 }
-                        { row = 3, col = 13 }
-                        { module_ =
-                            SourcePosition.at
-                                { row = 3, col = 8 }
-                                { row = 3, col = 13 }
-                                "Array"
-                        , args = []
-                        , alias = Nothing
-                        , expose = AST.Explicit []
-                        }
-                    , SourcePosition.at
-                        { row = 5, col = 1 }
-                        { row = 6, col = 10 }
-                        { module_ =
-                            SourcePosition.at
-                                { row = 5, col = 8 }
-                                { row = 5, col = 14 }
-                                "Basics"
-                        , args = []
-                        , alias = Nothing
-                        , expose =
-                            AST.Explicit
-                                [ AST.ExposedLower <|
-                                    SourcePosition.at
-                                        { row = 6, col = 6 }
-                                        { row = 6, col = 9 }
-                                        "max"
-                                ]
-                        }
-                    ]
-                , values = []
-                , unions = []
-                , aliases = []
-                , binops = []
-                , effects = AST.NoEffects
-                }
+            )
         , test "requires with alias and exposing" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
@@ -422,90 +444,92 @@ tests =
                 import Nested.Module as N.M exposing (T)
                 """
             |> expect
-                { name =
-                    SourcePosition.at
-                        { row = 1, col = 8 }
-                        { row = 1, col = 16 }
-                        "MyModule"
-                , exports = AST.Open
-                , docs = Nothing
-                , requires =
-                    [ SourcePosition.at
-                        { row = 3, col = 1 }
-                        { row = 3, col = 16 }
-                        { module_ =
-                            SourcePosition.at
-                                { row = 3, col = 9 }
-                                { row = 3, col = 16 }
-                                "Compare"
-                        , alias = Nothing
-                        , expose = AST.Explicit []
-                        }
-                    , SourcePosition.at
-                        { row = 4, col = 1 }
-                        { row = 4, col = 31 }
-                        { module_ =
-                            SourcePosition.at
-                                { row = 4, col = 9 }
-                                { row = 4, col = 23 }
-                                "String.Compare"
-                        , alias = Just "StrC"
-                        , expose = AST.Explicit []
-                        }
-                    , SourcePosition.at
-                        { row = 5, col = 1 }
-                        { row = 5, col = 30 }
-                        { module_ =
-                            SourcePosition.at
-                                { row = 5, col = 9 }
-                                { row = 5, col = 16 }
-                                "Package"
-                        , alias = Nothing
-                        , expose = AST.Open
-                        }
-                    ]
-                , imports =
-                    [ SourcePosition.at
-                        { row = 7, col = 1 }
-                        { row = 7, col = 27 }
-                        { module_ =
-                            SourcePosition.at
-                                { row = 7, col = 8 }
-                                { row = 7, col = 13 }
-                                "Array"
-                        , args = []
-                        , alias = Nothing
-                        , expose = AST.Open
-                        }
-                    , SourcePosition.at
-                        { row = 8, col = 1 }
-                        { row = 8, col = 41 }
-                        { module_ =
-                            SourcePosition.at
-                                { row = 8, col = 8 }
-                                { row = 8, col = 21 }
-                                "Nested.Module"
-                        , args = []
-                        , alias = Just "N.M"
-                        , expose =
-                            AST.Explicit
-                                [ AST.ExposedUpper
-                                    { name =
-                                        SourcePosition.at
-                                            { row = 8, col = 39 }
-                                            { row = 8, col = 40 }
-                                            "T"
-                                    , privacy = AST.Private
-                                    }
-                                ]
+                (AST.Implementation
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , requires =
+                        [ SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 3, col = 16 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 3, col = 9 }
+                                    { row = 3, col = 16 }
+                                    "Compare"
+                            , alias = Nothing
+                            , expose = AST.Explicit []
+                            }
+                        , SourcePosition.at
+                            { row = 4, col = 1 }
+                            { row = 4, col = 31 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 4, col = 9 }
+                                    { row = 4, col = 23 }
+                                    "String.Compare"
+                            , alias = Just "StrC"
+                            , expose = AST.Explicit []
+                            }
+                        , SourcePosition.at
+                            { row = 5, col = 1 }
+                            { row = 5, col = 30 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 5, col = 9 }
+                                    { row = 5, col = 16 }
+                                    "Package"
+                            , alias = Nothing
+                            , expose = AST.Open
                             }
                         ]
-                , values = []
-                , unions = []
-                , aliases = []
-                , binops = []
-                , effects = AST.NoEffects
-                }
+                    , imports =
+                        [ SourcePosition.at
+                            { row = 7, col = 1 }
+                            { row = 7, col = 27 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 7, col = 8 }
+                                    { row = 7, col = 13 }
+                                    "Array"
+                            , args = []
+                            , alias = Nothing
+                            , expose = AST.Open
+                            }
+                        , SourcePosition.at
+                            { row = 8, col = 1 }
+                            { row = 8, col = 41 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 8, col = 8 }
+                                    { row = 8, col = 21 }
+                                    "Nested.Module"
+                            , args = []
+                            , alias = Just "N.M"
+                            , expose =
+                                AST.Explicit
+                                    [ AST.ExposedUpper
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 8, col = 39 }
+                                                { row = 8, col = 40 }
+                                                "T"
+                                        , privacy = AST.Private
+                                        }
+                                    ]
+                                }
+                            ]
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+                )
         , test "imports with arguments" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
@@ -515,51 +539,53 @@ tests =
                 import Dict String as StrDict
                 """
                 |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 8 }
-                            { row = 1, col = 16 }
-                            "MyModule"
-                    , exports = AST.Open
-                    , docs = Nothing
-                    , requires = []
-                    , imports =
-                        [ SourcePosition.at
-                            { row = 3, col = 1 }
-                            { row = 3, col = 14 }
-                            { module_ =
-                                SourcePosition.at
-                                    { row = 3, col = 8 }
-                                    { row = 3, col = 14 }
-                                    "String"
-                            , args = []
-                            , alias = Nothing
-                            , expose = AST.Explicit []
-                            }
-                        , SourcePosition.at
-                            { row = 4, col = 1 }
-                            { row = 4, col = 30 }
-                            { module_ =
-                                SourcePosition.at
-                                    { row = 4, col = 8 }
-                                    { row = 4, col = 12 }
-                                    "Dict"
-                            , args =
-                                [ SourcePosition.at
-                                    { row = 4, col = 13 }
-                                    { row = 4, col = 19 }
-                                    "String"
-                                ]
-                            , alias = Just "StrDict"
-                            , expose = AST.Explicit []
-                            }
-                        ]
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops = []
-                    , effects = AST.NoEffects
-                    }
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 8 }
+                                { row = 1, col = 16 }
+                                "MyModule"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports =
+                            [ SourcePosition.at
+                                { row = 3, col = 1 }
+                                { row = 3, col = 14 }
+                                { module_ =
+                                    SourcePosition.at
+                                        { row = 3, col = 8 }
+                                        { row = 3, col = 14 }
+                                        "String"
+                                , args = []
+                                , alias = Nothing
+                                , expose = AST.Explicit []
+                                }
+                            , SourcePosition.at
+                                { row = 4, col = 1 }
+                                { row = 4, col = 30 }
+                                { module_ =
+                                    SourcePosition.at
+                                        { row = 4, col = 8 }
+                                        { row = 4, col = 12 }
+                                        "Dict"
+                                , args =
+                                    [ SourcePosition.at
+                                        { row = 4, col = 13 }
+                                        { row = 4, col = 19 }
+                                        "String"
+                                    ]
+                                , alias = Just "StrDict"
+                                , expose = AST.Explicit []
+                                }
+                            ]
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops = []
+                        , effects = AST.NoEffects
+                        }
+                    )
         , test "imports with arguments must have alias" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
@@ -578,46 +604,48 @@ tests =
                 infix non   4 (==) = eq
                 """
                 |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 8 }
-                            { row = 1, col = 16 }
-                            "MyModule"
-                    , exports = AST.Open
-                    , docs = Nothing
-                    , requires = []
-                    , imports = []
-                    , values = []
-                    , unions = []
-                    , aliases = []
-                    , binops =
-                        [ SourcePosition.at
-                            { row = 3, col = 1 }
-                            { row = 3, col = 25 }
-                            { fn = "apR"
-                            , symbol = "|>"
-                            , associativity = AST.OpALeft
-                            , precedence = 0
-                            }
-                        , SourcePosition.at
-                            { row = 4, col = 1 }
-                            { row = 4, col = 25 }
-                            { fn = "and"
-                            , symbol = "&&"
-                            , associativity = AST.OpARight
-                            , precedence = 3
-                            }
-                        , SourcePosition.at
-                            { row = 5, col = 1 }
-                            { row = 5, col = 24 }
-                            { fn = "eq"
-                            , symbol = "=="
-                            , associativity = AST.OpANone
-                            , precedence = 4
-                            }
-                        ]
-                     , effects = AST.NoEffects
-                     }
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 8 }
+                                { row = 1, col = 16 }
+                                "MyModule"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports = []
+                        , values = []
+                        , unions = []
+                        , aliases = []
+                        , binops =
+                            [ SourcePosition.at
+                                { row = 3, col = 1 }
+                                { row = 3, col = 25 }
+                                { fn = "apR"
+                                , symbol = "|>"
+                                , associativity = AST.OpALeft
+                                , precedence = 0
+                                }
+                            , SourcePosition.at
+                                { row = 4, col = 1 }
+                                { row = 4, col = 25 }
+                                { fn = "and"
+                                , symbol = "&&"
+                                , associativity = AST.OpARight
+                                , precedence = 3
+                                }
+                            , SourcePosition.at
+                                { row = 5, col = 1 }
+                                { row = 5, col = 24 }
+                                { fn = "eq"
+                                , symbol = "=="
+                                , associativity = AST.OpANone
+                                , precedence = 4
+                                }
+                            ]
+                         , effects = AST.NoEffects
+                         }
+                    )
          , test "Module with values, type aliases, unions, and ports" <| \_ ->
              Parser.run PM.parser Context.empty
                  """
@@ -638,16 +666,17 @@ tests =
                  port somePort : String -> Cmd msg
                  """
                  |> expect
-                     { name =
-                         SourcePosition.at
-                             { row = 1, col = 8 }
-                             { row = 1, col = 16 }
-                             "MyValues"
-                     , exports = AST.Open
-                     , docs = Nothing
-                     , requires = []
-                     , imports = []
-                     , values =
+                     (AST.Implementation
+                         { name =
+                             SourcePosition.at
+                                 { row = 1, col = 8 }
+                                 { row = 1, col = 16 }
+                                 "MyValues"
+                         , exports = AST.Open
+                         , docs = Nothing
+                         , requires = []
+                         , imports = []
+                         , values =
                           [ SourcePosition.at
                               { row = 3, col = 1 }
                               { row = 4, col = 9 }
@@ -839,7 +868,8 @@ tests =
                                         }
                                 }
                             ]
-                    }
+                         }
+                    )
          , test "Declaration after when expression" <| \_ ->
              Parser.run PM.parser Context.empty
                  """
@@ -857,20 +887,21 @@ tests =
                      String.fromInt n
                  """
                  |> expect
-                    { name =
-                        SourcePosition.at
-                            { row = 1, col = 8 }
-                            { row = 1, col = 12 }
-                            "Test"
-                    , exports = AST.Open
-                    , docs = Nothing
-                    , requires = []
-                    , imports = []
-                    , aliases = []
-                    , binops = []
-                    , unions = []
-                    , effects = AST.NoEffects
-                    , values =
+                    (AST.Implementation
+                        { name =
+                            SourcePosition.at
+                                { row = 1, col = 8 }
+                                { row = 1, col = 12 }
+                                "Test"
+                        , exports = AST.Open
+                        , docs = Nothing
+                        , requires = []
+                        , imports = []
+                        , aliases = []
+                        , binops = []
+                        , unions = []
+                        , effects = AST.NoEffects
+                        , values =
                         [ SourcePosition.at
                                 { row = 3, col = 1 }
                                 { row = 8, col = 21 }
@@ -1055,6 +1086,7 @@ tests =
                                 }
                         ]
                     }
+                )
         ]
 
 expect : AST.Module -> Result (Array (Parser.DeadEnd c e)) AST.Module -> Expectation

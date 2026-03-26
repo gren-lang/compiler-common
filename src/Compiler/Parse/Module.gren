@@ -93,26 +93,27 @@ parser =
                 ports =
                     Array.mapAndKeepJust declarationToModulePort decls
             in
-            { name = name
-            , exports = exports
-            , docs = docs
-            , requires = requires
-            , imports = imports
-            , values = values
-            , unions = unions
-            , aliases = aliases
-            , binops = binops
-            , effects =
-                when ports is
-                    [] ->
-                        -- TODO: support both ports and effects
-                        -- currently, only kernel devs can define effects
-                        -- so don't worry about it for now
-                        effects
+            AST.Implementation
+                { name = name
+                , exports = exports
+                , docs = docs
+                , requires = requires
+                , imports = imports
+                , values = values
+                , unions = unions
+                , aliases = aliases
+                , binops = binops
+                , effects =
+                    when ports is
+                        [] ->
+                            -- TODO: support both ports and effects
+                            -- currently, only kernel devs can define effects
+                            -- so don't worry about it for now
+                            effects
 
-                    _ ->
-                        AST.Ports ports
-            }
+                        _ ->
+                            AST.Ports ports
+                }
         )
         |> Parser.keep
             (Parser.oneOf
