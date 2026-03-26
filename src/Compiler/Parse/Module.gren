@@ -359,24 +359,9 @@ parseOperatorDeclaration =
 
 
 requireLoopParser
-    : Array (SourcePosition.Located AST.Import)
-    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located  AST.Import)) (Array (SourcePosition.Located  AST.Import)))
+    : Array (SourcePosition.Located AST.Require)
+    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located AST.Require)) (Array (SourcePosition.Located AST.Require)))
 requireLoopParser imps =
-    importLoopParserImpl "require" imps
-
-
-importLoopParser
-    : Array (SourcePosition.Located AST.Import)
-    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located  AST.Import)) (Array (SourcePosition.Located  AST.Import)))
-importLoopParser imps =
-    importLoopParserImpl "import" imps
-
-
-importLoopParserImpl
-    : String
-    -> Array (SourcePosition.Located AST.Import)
-    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located  AST.Import)) (Array (SourcePosition.Located  AST.Import)))
-importLoopParserImpl importKeyword imps =
     Parser.oneOf
         [ Parser.succeed
             (\moduleName ->
@@ -388,7 +373,7 @@ importLoopParserImpl importKeyword imps =
                     , expose = AST.Explicit []
                     }
             )
-            |> Parser.skip (Parser.token importKeyword (ExpectedKeyword importKeyword))
+            |> Parser.skip (Parser.token "require "(ExpectedKeyword "require"))
             |> Parser.skip spaceParser
             |> Parser.keep moduleNameParser
             |> Parser.skip spaceParser
@@ -446,6 +431,105 @@ importLoopParserImpl importKeyword imps =
                 )
         , Parser.succeed (Parser.Done imps)
         ]
+
+
+importLoopParser
+    : Array (SourcePosition.Located AST.Import)
+    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located AST.Import)) (Array (SourcePosition.Located AST.Import)))
+importLoopParser imps =
+    Parser.oneOf
+        [ Parser.succeed
+            (\moduleName args ->
+                SourcePosition.at
+                    { moduleName.start | col = 1 }
+                    ( Array.last args
+                        |> Maybe.map .end
+                        |> Maybe.withDefault moduleName.end
+                    )
+                    { module_ = moduleName
+                    , args = args
+                    , alias = Nothing
+                    , expose = AST.Explicit []
+                    }
+            )
+            |> Parser.skip (Parser.token "import "(ExpectedKeyword "import"))
+            |> Parser.skip spaceParser
+            |> Parser.keep moduleNameParser
+            |> Parser.skip spaceParser
+            |> Parser.keep (Parser.loop [] parseImportArgLoop)
+            |> Parser.andThen
+                (\baseImport ->
+                    if Array.isEmpty baseImport.value.args then
+                        Parser.oneOf
+                            [ parseImportAlias baseImport
+                            , Parser.succeed baseImport
+                            ]
+                    else
+                        -- Import has arguments, so alias is required
+                        parseImportAlias baseImport
+                )
+            |> Parser.andThen
+                (\importWithAlias ->
+                    Parser.succeed
+                        (\expose endPos ->
+                            { importWithAlias
+                                | end =
+                                    -- implicitly check if we actually found an exposing list
+                                    if expose == AST.Explicit [] then
+                                        importWithAlias.end
+
+                                    else
+                                        endPos
+                                , value =
+                                    { importWithAlias.value
+                                        | expose = expose
+                                    }
+                            }
+                        )
+                        |> Parser.keep
+                            (Parser.oneOf
+                                [ parseExposingStatement
+                                , Parser.succeed (AST.Explicit [])
+                                ]
+                            )
+                        |> Parser.keep Parser.getPosition
+                        |> Parser.skip spaceParser
+                )
+            |> Parser.map
+                (\finalImport ->
+                    Parser.Loop <|
+                        Array.pushLast finalImport imps
+                )
+        , Parser.succeed (Parser.Done imps)
+        ]
+
+
+parseImportArgLoop : Array (SourcePosition.Located String) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located String)) (Array (SourcePosition.Located String)))
+parseImportArgLoop args =
+    Parser.oneOf
+        [ Parser.succeed (\next -> Parser.Loop <| Array.pushLast next args)
+            |> Parser.keep moduleNameParser
+            |> Parser.skip spaceParser
+        , Parser.succeed (Parser.Done args)
+        ]
+
+
+parseImportAlias : SourcePosition.Located AST.Import -> Parser Context Error (SourcePosition.Located AST.Import)
+parseImportAlias baseImport =
+    Parser.succeed
+        (\alias ->
+            { baseImport
+                | end = alias.end
+                , value =
+                    { baseImport.value
+                        | alias = Just alias.value
+                    }
+            }
+        )
+        |> Parser.skip (Parser.token "as" (ExpectedKeyword "as"))
+        |> Parser.skip spaceParser
+        |> Parser.keep moduleNameParser
+        |> Parser.skip spaceParser
 
 
 operatorLoopParser

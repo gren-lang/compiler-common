@@ -245,6 +245,7 @@ tests =
                                     { row = 3, col = 8 }
                                     { row = 3, col = 13 }
                                     "Array"
+                            , args = []
                             , alias = Nothing
                             , expose = AST.Explicit []
                             }
@@ -280,6 +281,7 @@ tests =
                                     { row = 3, col = 8 }
                                     { row = 3, col = 13 }
                                     "Array"
+                            , args = []
                             , alias = Just "A"
                             , expose = AST.Explicit []
                             }
@@ -316,6 +318,7 @@ tests =
                                 { row = 3, col = 8 }
                                 { row = 3, col = 13 }
                                 "Array"
+                        , args = []
                         , alias = Nothing
                         , expose = AST.Open
                         }
@@ -327,6 +330,7 @@ tests =
                                 { row = 4, col = 8 }
                                 { row = 4, col = 21 }
                                 "Nested.Module"
+                        , args = []
                         , alias = Just "N.M"
                         , expose =
                             AST.Explicit
@@ -375,6 +379,7 @@ tests =
                                 { row = 3, col = 8 }
                                 { row = 3, col = 13 }
                                 "Array"
+                        , args = []
                         , alias = Nothing
                         , expose = AST.Explicit []
                         }
@@ -386,6 +391,7 @@ tests =
                                 { row = 5, col = 8 }
                                 { row = 5, col = 14 }
                                 "Basics"
+                        , args = []
                         , alias = Nothing
                         , expose =
                             AST.Explicit
@@ -467,6 +473,7 @@ tests =
                                 { row = 7, col = 8 }
                                 { row = 7, col = 13 }
                                 "Array"
+                        , args = []
                         , alias = Nothing
                         , expose = AST.Open
                         }
@@ -478,6 +485,7 @@ tests =
                                 { row = 8, col = 8 }
                                 { row = 8, col = 21 }
                                 "Nested.Module"
+                        , args = []
                         , alias = Just "N.M"
                         , expose =
                             AST.Explicit
@@ -498,6 +506,68 @@ tests =
                 , binops = []
                 , effects = AST.NoEffects
                 }
+        , test "imports with arguments" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import String
+                import Dict String as StrDict
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , requires = []
+                    , imports =
+                        [ SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 3, col = 14 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 3, col = 8 }
+                                    { row = 3, col = 14 }
+                                    "String"
+                            , args = []
+                            , alias = Nothing
+                            , expose = AST.Explicit []
+                            }
+                        , SourcePosition.at
+                            { row = 4, col = 1 }
+                            { row = 4, col = 30 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 4, col = 8 }
+                                    { row = 4, col = 12 }
+                                    "Dict"
+                            , args =
+                                [ SourcePosition.at
+                                    { row = 4, col = 13 }
+                                    { row = 4, col = 19 }
+                                    "String"
+                                ]
+                            , alias = Just "StrDict"
+                            , expose = AST.Explicit []
+                            }
+                        ]
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+        , test "imports with arguments must have alias" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Dict String
+                """
+                |> expectErr (PM.ExpectedKeyword "as")
         , test "operators" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
@@ -995,3 +1065,16 @@ expect expected result =
 
         Ok res ->
             Expect.equal expected res
+
+expectErr : PM.Error -> Result (Array (Parser.DeadEnd c PM.Error)) AST.Module -> Expectation
+expectErr expected result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected error"
+
+        Err problems ->
+            when Array.first problems is
+                Just firstProblem ->
+                    Expect.equal expected firstProblem.problem
+                Nothing ->
+                    Expect.fail "Expected error but got empty error array"

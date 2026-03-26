@@ -23,6 +23,7 @@ module Compiler.Ast.Source exposing
     , Exposing (..)
     , Exposed (..)
     , Privacy (..)
+    , Require
     , Import
     , Effects (..)
     , Manager (..)
@@ -32,7 +33,7 @@ module Compiler.Ast.Source exposing
 
 {-| The Abstract Syntax Tree (AST) of Gren.
 
-@docs Expression, Expression_, VarType, IfBranch, WhenBranch, RecordField, Def, DefineRecord, Pattern, Pattern_, PRecordField, Type, Type_, TRecordField, Alias, Union, UnionVariant, Value, Port, Module, ModuleDeclaration, Exposing, Exposed, Privacy, Import, Effects, Manager, Infix, BinopAssociativity
+@docs Expression, Expression_, VarType, IfBranch, WhenBranch, RecordField, Def, DefineRecord, Pattern, Pattern_, PRecordField, Type, Type_, TRecordField, Alias, Union, UnionVariant, Value, Port, Module, ModuleDeclaration, Exposing, Exposed, Privacy, Require, Import, Effects, Manager, Infix, BinopAssociativity
 
 -}
 
@@ -300,7 +301,7 @@ type alias Module =
   { name : SourcePosition.Located String
   , exports : Exposing
   , docs : Maybe (SourcePosition.Located String)
-  , requires : Array (SourcePosition.Located Import)
+  , requires : Array (SourcePosition.Located Require)
   , imports : Array (SourcePosition.Located Import)
   , values : Array (ModuleDeclaration Value)
   , unions : Array (ModuleDeclaration Union)
@@ -343,8 +344,18 @@ type Privacy
 
 {-|
 -}
+type alias Require =
+  { module_ : SourcePosition.Located String
+  , alias : Maybe String
+  , expose : Exposing
+  }
+
+
+{-|
+-}
 type alias Import =
   { module_ : SourcePosition.Located String
+  , args : Array (SourcePosition.Located String)
   , alias : Maybe String
   , expose : Exposing
   }
