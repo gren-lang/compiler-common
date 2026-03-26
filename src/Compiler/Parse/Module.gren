@@ -16,6 +16,7 @@ import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Ast.Source as AST
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Space as Space
+import Compiler.Parse.Type as Type
 import Compiler.Parse.Variable as Variable
 import Compiler.Parse.Operator as Operator
 import Compiler.Parse.Declaration as Declaration
@@ -33,6 +34,7 @@ type Error
     | OperatorError Operator.Error
     | ExpectedIntPrecedence
     | DeclarationError Declaration.Error
+    | TypeError Type.Error
     | SpaceError Space.Error
     | ExpectedEnd
 
@@ -66,6 +68,9 @@ errorToString error =
         ExpectedEnd ->
             "Expected end of file"
 
+        TypeError typeError ->
+            Type.errorToString typeError
+
 
 spaceParser : Parser Context Error {}
 spaceParser =
@@ -78,6 +83,47 @@ spaceParser =
 -}
 parser : Parser Context Error AST.Module
 parser =
+    -- TODO: post parse verification. Check Haskell-based compiler for details
+    Parser.oneOf
+        [ parseSignatureModule
+        , parseImplementationModule
+        ]
+
+
+parseSignatureModule : Parser Context Error AST.Module
+parseSignatureModule =
+    Parser.succeed
+        (\name docs imports sigs ->
+            let
+                values =
+                    Array.mapAndKeepJust parsedSignatureToModuleValueSignature sigs
+
+                types =
+                    Array.mapAndKeepJust parsedSignatureToModuleTypeSignature sigs
+            in
+            AST.Signature
+                { name = name
+                , docs = docs
+                , imports = imports
+                , values = values
+                , types = types
+                }
+        )
+        |> Parser.skip (Parser.token "signature" (ExpectedKeyword "signature"))
+        |> Parser.skip spaceParser
+        |> Parser.skip (Parser.token "module" (ExpectedKeyword "module"))
+        |> Parser.skip spaceParser
+        |> Parser.keep moduleNameParser
+        |> Parser.skip spaceParser
+        |> Parser.keep (Declaration.docParser ExpectedKeyword)
+        |> Parser.skip spaceParser
+        |> Parser.keep (Parser.loop [] importLoopParser)
+        |> Parser.skip spaceParser
+        |> Parser.keep (Parser.loop [] signatureLoopParser)
+
+
+parseImplementationModule : Parser Context Error AST.Module
+parseImplementationModule =
     Parser.succeed
         (\{ name, effects } exports docs requires imports binops decls ->
             let
@@ -639,6 +685,79 @@ declarationToModulePort decl =
                     v.signature.end
                     { docs = decl.docs
                     , value = v
+                    }
+
+        _ ->
+            Nothing
+
+
+type ParsedSignature
+    = ValueSignature { doc : Maybe (SourcePosition.Located String), value : AST.ValueSignature }
+    | TypeSignature { doc : Maybe (SourcePosition.Located String), value : AST.TypeSignature }
+
+
+signatureLoopParser
+    : Array ParsedSignature
+    -> Parser Context Error (Parser.Step (Array ParsedSignature) (Array ParsedSignature))
+signatureLoopParser decls =
+    Parser.oneOf
+        [ Parser.succeed
+            (\doc tipe ->
+                Parser.Loop <|
+                    Array.pushLast (TypeSignature { doc = doc, value = { name = tipe } }) decls
+            )
+            |> Parser.keep (Declaration.docParser ExpectedKeyword)
+            |> Parser.skip spaceParser
+            |> Parser.skip (Parser.token "type" (ExpectedKeyword "type"))
+            |> Parser.skip spaceParser
+            |> Parser.keep ctorNameParser
+            |> Parser.skip spaceParser
+        , Parser.succeed
+            (\doc name tipe ->
+                Parser.Loop <|
+                    Array.pushLast (ValueSignature { doc = doc, value = { name = name, signature = tipe } }) decls
+            )
+            |> Parser.keep (Declaration.docParser ExpectedKeyword)
+            |> Parser.skip spaceParser
+            |> Parser.keep
+                (SourcePosition.parser Variable.lowerCase
+                    |> Parser.mapError VariableError
+                )
+            |> Parser.skip spaceParser
+            |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
+            |> Parser.skip spaceParser
+            |> Parser.keep (Parser.mapError TypeError Type.parser)
+        , Parser.succeed (Parser.Done decls)
+            |> Parser.skip (Parser.end ExpectedEnd)
+        ]
+
+
+parsedSignatureToModuleValueSignature : ParsedSignature -> Maybe (AST.ModuleDeclaration AST.ValueSignature)
+parsedSignatureToModuleValueSignature sig =
+    when sig is
+        ValueSignature { doc, value } ->
+            Just <|
+                SourcePosition.at
+                    value.name.start
+                    value.signature.end
+                    { docs = doc
+                    , value = value
+                    }
+
+        _ ->
+            Nothing
+
+
+parsedSignatureToModuleTypeSignature : ParsedSignature -> Maybe (AST.ModuleDeclaration AST.TypeSignature)
+parsedSignatureToModuleTypeSignature sig =
+    when sig is
+        TypeSignature { doc, value } ->
+            Just <|
+                SourcePosition.at
+                    value.name.start
+                    value.name.end
+                    { docs = doc
+                    , value = value
                     }
 
         _ ->
