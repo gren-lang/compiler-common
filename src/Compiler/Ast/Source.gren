@@ -17,8 +17,12 @@ module Compiler.Ast.Source exposing
     , Union
     , UnionVariant
     , Value
+    , ValueSignature
+    , TypeSignature
     , Port
-    , Module
+    , Module (..)
+    , ModuleImplementation
+    , ModuleSignature
     , ModuleDeclaration
     , Exposing (..)
     , Exposed (..)
@@ -33,7 +37,7 @@ module Compiler.Ast.Source exposing
 
 {-| The Abstract Syntax Tree (AST) of Gren.
 
-@docs Expression, Expression_, VarType, IfBranch, WhenBranch, RecordField, Def, DefineRecord, Pattern, Pattern_, PRecordField, Type, Type_, TRecordField, Alias, Union, UnionVariant, Value, Port, Module, ModuleDeclaration, Exposing, Exposed, Privacy, Require, Import, Effects, Manager, Infix, BinopAssociativity
+@docs Expression, Expression_, VarType, IfBranch, WhenBranch, RecordField, Def, DefineRecord, Pattern, Pattern_, PRecordField, Type, Type_, TRecordField, Alias, Union, UnionVariant, Value, ValueSignature, TypeSignature, Port, Module, ModuleImplementation, ModuleSignature, ModuleDeclaration, Exposing, Exposed, Privacy, Require, Import, Effects, Manager, Infix, BinopAssociativity
 
 -}
 
@@ -287,6 +291,22 @@ type alias Value =
 
 {-|
 -}
+type alias ValueSignature =
+  { name : SourcePosition.Located String
+  , signature : Type
+  }
+
+
+{-|
+-}
+type alias TypeSignature =
+  { name : SourcePosition.Located String
+  , signature : Type
+  }
+
+
+{-|
+-}
 type alias Port =
   { name : SourcePosition.Located String
   , signature : Type
@@ -297,7 +317,14 @@ type alias Port =
 
 {-|
 -}
-type alias Module =
+type Module
+  = Implementation ModuleImplementation
+  | Signature ModuleSignature
+
+
+{-|
+-}
+type alias ModuleImplementation =
   { name : SourcePosition.Located String
   , exports : Exposing
   , docs : Maybe (SourcePosition.Located String)
@@ -308,6 +335,17 @@ type alias Module =
   , aliases : Array (ModuleDeclaration Alias)
   , binops : Array (SourcePosition.Located Infix)
   , effects : Effects
+  }
+
+
+{-|
+-}
+type alias ModuleSignature =
+  { name : SourcePosition.Located String
+  , docs : Maybe (SourcePosition.Located String)
+  , imports : Array (SourcePosition.Located Import)
+  , values : Array (ModuleDeclaration ValueSignature)
+  , unions : Array (ModuleDeclaration TypeSignature)
   }
 
 
