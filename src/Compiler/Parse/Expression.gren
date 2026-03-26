@@ -363,7 +363,7 @@ letDefNamedParser =
                                 |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
                                 |> Parser.skip spaceParser
                                 |> Parser.keep
-                                    (Type.expression
+                                    (Type.parser
                                         |> Parser.mapError TypeError
                                     )
                                 |> Parser.keep
