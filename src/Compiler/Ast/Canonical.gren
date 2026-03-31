@@ -1,0 +1,346 @@
+module Compiler.Ast.Canonical exposing (..)
+
+
+{- Creating a canonical AST means finding the home module for all variables.
+So if you have L.map, you need to figure out that it is from the core/core
+package in the List module.
+-}
+
+import Compiler.Ast.Source as Src
+import Compiler.ModuleName exposing (ModuleName)
+import Compiler.SourcePosition as SourcePosition
+import Dict exposing (Dict)
+import Set exposing (Set)
+
+
+type alias Expression =
+  SourcePosition.Located Expression_
+
+
+-- CACHE Annotations for type inference
+type Expression_
+  = VarLocal String
+  | VarTopLevel
+    { home : ModuleName
+    , name : String
+    }
+  | VarKernel
+    { kernelModule : String
+    , name : String
+    }
+  | VarForeign
+    { home : ModuleName
+    , name : String
+    , annotation : Annotation
+    }
+  | VarCtor
+    { opts : CtorOpts
+    , home : ModuleName
+    , name : String
+    , index : Int
+    , annotation : Annotation
+    }
+  | VarDebug
+    { home : ModuleName
+    , name : String
+    , annotation : Annotation
+    }
+  | VarOperator
+    { symbol : String
+    , home : ModuleName
+    , realName : String
+    , annotation : Annotation
+    }
+  | Chr Char
+  | Str String
+  | Int Int
+  | Float Float
+  | Array (Array Expression)
+  | Negate Expression
+  | Binop
+    { symbol : String
+    , home : ModuleName
+    , realName : String
+    , annotation : Annotation
+    , left : Expression
+    , right : Expression
+    }
+  | Lambda
+    { patterns : Array Pattern
+    , expression : Expression
+    }
+  | Call
+    { fn : Expression
+    , args : Array Expression
+    }
+  | If
+    { branches : Array IfBranch
+    , elseBranch : Expression
+    }
+  | Let
+    { def : Def
+    , body : Expression
+    }
+  | LetRec
+    { defs : Array Def
+    , body : Expression
+    }
+  | LetDestruct
+    { pattern : Pattern
+    , value : Expression
+    , body : Expression
+    }
+  | When
+    { expression : Expression
+    , branches : Array WhenBranch
+    }
+  | Accessor String
+  | Access
+    { expression : Expression
+    , name : SourcePosition.Located String
+    }
+  | Update
+    { expression : Expression
+    , newFields : (Array RecordField)
+    }
+  | Record (Array RecordField)
+
+
+type alias IfBranch =
+    { test : Expression
+    , body : Expression
+    }
+
+
+type alias WhenBranch =
+    { pattern : Pattern
+    , expression : Expression
+    }
+
+
+type alias RecordField =
+    { name : SourcePosition.Located String
+    , expression : Expression
+    }
+
+
+-- DEFS
+
+
+type Def
+  = Def
+    { name : SourcePosition.Located String
+    , params : Array Pattern
+    , body : Expression
+    }
+  | TypedDef
+    { name : SourcePosition.Located String
+    , freeVars : FreeVars
+    , params : Array { pattern : Pattern, tipe : Type }
+    , body : Expression
+    , signature : Type
+    }
+
+
+-- DECLARATIONS
+
+
+type Decls
+  = Declare
+    { def : Def
+    , decls : Decls
+    }
+  | DeclareRec
+    { def : Def
+    , defs : Array Def
+    , decls : Decls
+    }
+  | SaveTheEnvironment
+
+
+-- PATTERNS
+
+
+type alias Pattern =
+  SourcePosition.Located Pattern_
+
+
+type Pattern_
+  = PAnything
+  | PVar String
+  | PRecord (Array PatternRecordField)
+  | PAlias
+    { pattern : Pattern
+    , alias : String
+    }
+  | PArray (Array Pattern)
+  | PBool
+    { union : Union
+    , bool : Bool
+    }
+  | PChr Char
+  | PStr String
+  | PInt Int
+  | PCtor
+      { home : ModuleName
+      , tipe : String
+      , union : Union
+      , name : String
+      , index : Int
+      , args : Array PatternCtorArg
+      }
+
+
+type alias PatternRecordField = SourcePosition.Located PatternRecordField_
+
+
+type alias PatternRecordField_ = { name : String, pattern : Pattern }
+
+
+type alias PatternCtorArg =
+  { index : Int -- CACHE for destructors/errors
+  , tipe : Type -- CACHE for type inference
+  , arg : Pattern
+  }
+
+
+-- TYPES
+
+
+type alias Annotation =
+    { freeVars : FreeVars
+    , tipe : Type
+    }
+
+
+type alias FreeVars = Set String
+
+
+type Type
+  = TLambda
+    { from : Type
+    , to : Type
+    }
+  | TVar String
+  | TType
+    { home : ModuleName
+    , name : String
+    , vars : Array Type
+    }
+  | TRecord
+    { fields : Dict String FieldType
+    , alias : Maybe String
+    }
+  | TAlias
+    { home : ModuleName
+    , name : String
+    , fields : Array { name : String, tipe : Type }
+    , aliasTipe : AliasType
+    }
+
+
+type AliasType
+  = Holey Type
+  | Filled Type
+
+
+-- NOTE: The Word16 marks the source order, but it may not be available
+-- for every canonical type. For example, if the canonical type is inferred
+-- the orders will all be zeros.
+type alias FieldType =
+    { sourceOrder : Int
+    , tipe : Type
+    }
+
+
+-- MODULES
+
+
+type alias Module =
+  { name : ModuleName
+  , exports : Exports
+  , decls : Decls
+  , unions : Dict String Union
+  , aliases : Dict String Alias
+  , binops : Dict String Binop
+  , effects : Effects
+  }
+
+
+type alias Alias =
+    { names : String
+    , tipe : Type
+    }
+
+
+type alias Binop =
+    { associativity : Src.BinopAssociativity
+    , precedence : Int
+    , name : String
+    }
+
+
+type Union = Union
+  { vars : Array String
+  , alts : Array Ctor
+  , opts : CtorOpts -- CACHE which optimizations are available
+  }
+
+
+type CtorOpts
+  = Normal
+  | Enum
+  | Unbox
+
+
+type alias Ctor =
+    { name : String
+    , index : Int
+    , args : Array Type
+    }
+
+
+-- EXPORTS
+
+
+type Exports
+  = ExportEverything SourcePosition.Region
+  | Export (Dict String (SourcePosition.Located Export))
+
+
+type Export
+  = ExportValue
+  | ExportBinop
+  | ExportAlias
+  | ExportUnionOpen
+  | ExportUnionClosed
+  | ExportPort
+
+
+-- EFFECTS
+
+
+type Effects
+  = NoEffects
+  | Ports (Dict String Port)
+  | Manager
+    { reg1 : SourcePosition.Region
+    , reg2 : SourcePosition.Region
+    , reg3 : SourcePosition.Region
+    , manager : Manager
+    }
+
+
+type Port
+  = Incoming { freeVars : FreeVars, payload : Type, func : Type }
+  | Outgoing { freeVars : FreeVars, payload : Type, func : Type }
+  | Task { freeVars : FreeVars, input : Maybe Type, payload : Type, func : Type }
+
+
+type Manager
+  = Cmd String
+  | Sub String
+  | Fx
+    { cmd : String
+    , sub : String
+    }
