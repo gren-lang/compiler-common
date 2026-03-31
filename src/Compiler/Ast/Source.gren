@@ -36,7 +36,7 @@ module Compiler.Ast.Source exposing
 
 -}
 
-import SourcePosition
+import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Number as Number
 
 

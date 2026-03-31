@@ -14,7 +14,7 @@ module Compiler.Parse.Module exposing
 
 import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Ast.Source as AST
-import SourcePosition
+import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Space as Space
 import Compiler.Parse.Variable as Variable
 import Compiler.Parse.Operator as Operator

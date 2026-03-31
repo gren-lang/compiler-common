@@ -7,7 +7,7 @@ import String.Parser.Advanced as Parser
 import Compiler.Parse.Expression as PE
 import Compiler.Parse.Number as Number
 import Compiler.Ast.Source as AST
-import SourcePosition
+import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Context as Context
 
 

@@ -6,7 +6,7 @@ import Fuzz exposing (Fuzzer)
 import String.Parser.Advanced as Parser
 import Compiler.Parse.Pattern as PT
 import Compiler.Ast.Source as AST
-import SourcePosition
+import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Context as Context
 
 

@@ -20,7 +20,7 @@ module Compiler.Parse.Space exposing
 import Compiler.Parse.Context as Context exposing (Context)
 import String.Parser.Advanced as Parser exposing (Parser)
 import Dict
-import SourcePosition
+import Compiler.SourcePosition as SourcePosition
 import Array.Builder
 
 

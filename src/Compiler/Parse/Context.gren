@@ -20,7 +20,7 @@ or generating code.
 
 import Dict exposing (Dict)
 import Array.Builder exposing (Builder)
-import SourcePosition
+import Compiler.SourcePosition as SourcePosition
 
 
 {-| The "hidden" state of a parser when parsing Gren code.

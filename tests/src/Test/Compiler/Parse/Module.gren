@@ -5,7 +5,7 @@ import Test exposing (Test, describe, test, fuzz)
 import String.Parser.Advanced as Parser
 import Compiler.Parse.Module as PM
 import Compiler.Parse.Number as Number
-import SourcePosition
+import Compiler.SourcePosition as SourcePosition
 import Compiler.Ast.Source as AST
 import Compiler.Parse.Context as Context
 

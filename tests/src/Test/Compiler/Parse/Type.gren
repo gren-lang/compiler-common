@@ -6,7 +6,7 @@ import String.Parser.Advanced as Parser
 import Compiler.Parse.Type as PT
 import Compiler.Parse.Context as Context
 import Compiler.Ast.Source as AST
-import SourcePosition
+import Compiler.SourcePosition as SourcePosition
 
 
 tests : Test

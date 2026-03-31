@@ -1,4 +1,4 @@
-module SourcePosition exposing
+module Compiler.SourcePosition exposing
     ( Position
     , emptyPos
     , Region
