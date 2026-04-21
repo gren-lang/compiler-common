@@ -57,7 +57,7 @@ errorToString error =
             "Expected newline"
         
         MisalignedMultiQuotes ->
-            "Multi-line string quotes are misaligned"
+            "Multi-line string lines are not indented equally"
 
 
 {-| Use this to parse character literals.
