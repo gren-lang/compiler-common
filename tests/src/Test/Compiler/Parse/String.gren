@@ -93,6 +93,9 @@ tests =
             , test "leading whitespace is determined by quote placement" <| \_ ->
                 Parser.run (skipLeadingWhitespace PS.string) Context.empty "\"\"\"\n  normal string\n   second line\n\"\"\""
                     |> Expect.equal (Ok "  normal string\n   second line")
+            , test "tolerate blank lines" <| \_ ->
+                Parser.run (skipLeadingWhitespace PS.string) Context.empty "  \"\"\"\n  normal string\n\n  third line\n  \"\"\""
+                    |> Expect.equal (Ok "normal string\n\nthird line")
             ]
         ]
 

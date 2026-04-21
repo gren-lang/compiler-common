@@ -193,12 +193,16 @@ string =
                                 lines
                                     |> Array.all
                                         (\line ->
-                                            let
-                                                whiteSpacePortion =
-                                                    String.takeFirst requiredIndent line
-                                            in
-                                            String.count whiteSpacePortion == requiredIndent
-                                                && String.all (\c -> c == ' ') whiteSpacePortion
+                                            if String.isEmpty line then
+                                                True
+
+                                            else
+                                                let
+                                                    whiteSpacePortion =
+                                                        String.takeFirst requiredIndent line
+                                                in
+                                                String.count whiteSpacePortion == requiredIndent
+                                                    && String.all (\c -> c == ' ') whiteSpacePortion
                                         )
                         in
                         if linesSufficientlyIndented then
