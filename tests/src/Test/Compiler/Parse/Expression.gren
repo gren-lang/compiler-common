@@ -62,23 +62,27 @@ tests =
                     |> expectErr PE.WildcardAttempt
             , test "nested accessors" <| \_ ->
                 Parser.run PE.parser Context.empty "nested.accessor.expression"
-                    |> expectExpression
-                        (AST.Access
-                            { expression =
-                                { start = { row = 1, col = 8}
-                                , end = { row = 1, col = 16}
-                                , value =
-                                    AST.Access
-                                        { expression =
-                                            { start = { row = 1, col = 1 }
-                                            , end = { row = 1, col = 7 }
-                                            , value = AST.Var { name = "nested", varType = AST.LowVar }
+                    |> expectLocatedExpression
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 1, col = 27 }
+                            (AST.Access
+                                { expression =
+                                    { start = { row = 1, col = 1 }
+                                    , end = { row = 1, col = 16 }
+                                    , value =
+                                        AST.Access
+                                            { expression =
+                                                { start = { row = 1, col = 1 }
+                                                , end = { row = 1, col = 7 }
+                                                , value = AST.Var { name = "nested", varType = AST.LowVar }
+                                                }
+                                            , accessor = "accessor"
                                             }
-                                        , accessor = "accessor"
-                                        }
+                                    }
+                                , accessor = "expression"
                                 }
-                            , accessor = "expression"
-                            }
+                            )
                         )
             , test "function calls" <| \_ ->
                 Parser.run PE.parser Context.empty "func a b"
@@ -362,7 +366,7 @@ tests =
                                                                                 "optimize"
                                                                       , value =
                                                                             SourcePosition.at
-                                                                                { row = 1, col = 72 }
+                                                                                { row = 1, col = 66 }
                                                                                 { row = 1, col = 80 }
                                                                                 (AST.Access
                                                                                     { accessor = "optimize"
@@ -437,7 +441,7 @@ tests =
                                                                                 "optimize"
                                                                       , value =
                                                                             SourcePosition.at
-                                                                                { row = 3, col = 28 }
+                                                                                { row = 3, col = 22 }
                                                                                 { row = 3, col = 36 }
                                                                                 (AST.Access
                                                                                     { accessor = "optimize"
@@ -1814,6 +1818,16 @@ expectExpression expected result =
             Expect.fail (Debug.toString err)
 
         Ok { value } ->
+            Expect.equal expected value
+
+
+expectLocatedExpression : (SourcePosition.Located a) -> Result (Array (Parser.DeadEnd c e)) (SourcePosition.Located a) -> Expectation
+expectLocatedExpression expected result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok value ->
             Expect.equal expected value
 
 

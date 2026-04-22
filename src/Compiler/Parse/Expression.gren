@@ -671,9 +671,9 @@ accessible : AST.Expression -> Parser Context Error AST.Expression
 accessible currentExpression =
     Parser.oneOf
         [ Parser.succeed
-            (\start name end ->
+            (\name end ->
                 SourcePosition.at
-                    start
+                    currentExpression.start
                     end
                     (AST.Access
                         { accessor = name
@@ -682,7 +682,6 @@ accessible currentExpression =
                     )
             )
             |> Parser.skip (Parser.chompChar '.' (ExpectedChar '.'))
-            |> Parser.keep Parser.getPosition
             |> Parser.keep lowerCaseVariable
             |> Parser.keep Parser.getPosition
             |> Parser.andThen accessible
