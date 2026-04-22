@@ -311,6 +311,48 @@ tests =
                                     (AST.StringLiteral "bar")
                             }
                         )
+            , test "can start with \"type\"" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    typeCheck = True
+                    """
+                    |> expect
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 10 }
+                                    "typeCheck"
+                            , signature = Nothing
+                            , args = []
+                            , body =
+                                SourcePosition.at
+                                    { row = 1, col = 13 }
+                                    { row = 1, col = 17 }
+                                    (AST.Var { varType = AST.CapVar, name = "True" })
+                            }
+                        )
+            , test "can start with \"port\"" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    portCheck = True
+                    """
+                    |> expect
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 10 }
+                                    "portCheck"
+                            , signature = Nothing
+                            , args = []
+                            , body =
+                                SourcePosition.at
+                                    { row = 1, col = 13 }
+                                    { row = 1, col = 17 }
+                                    (AST.Var { varType = AST.CapVar, name = "True" })
+                            }
+                        )
             , test "Simple case with docs" <| \_ ->
                 Parser.run PD.parser Context.empty
                     """

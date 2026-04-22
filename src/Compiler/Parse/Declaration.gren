@@ -165,7 +165,7 @@ docParser toErr =
 typeParser : Parser Context Error DeclarationValue
 typeParser =
     Parser.succeed identity
-        |> Parser.skip (Parser.token "type" (ExpectedKeyword "type"))
+        |> Parser.skip (Parser.keyword "type" (ExpectedKeyword "type"))
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.oneOf [ aliasParser, unionParser ])
 
@@ -180,7 +180,7 @@ aliasParser =
                 , type_ = tipe
                 }
         )
-        |> Parser.skip (Parser.token "alias" (ExpectedKeyword "alias"))
+        |> Parser.skip (Parser.keyword "alias" (ExpectedKeyword "alias"))
         |> Parser.skip spaceParser
         |> Parser.keep (SourcePosition.parser upperCaseVariable)
         |> Parser.skip spaceParser
@@ -222,8 +222,6 @@ unionParser =
                         (Parser.loop [ firstVariant ] variantLoopParser)
                     )
             )
-
-
 
 
 variantParser : Parser Context Error (SourcePosition.Located AST.UnionVariant)
@@ -276,7 +274,7 @@ portParser =
                 , signature = tipe
                 }
         )
-        |> Parser.skip (Parser.token "port" (ExpectedKeyword "port"))
+        |> Parser.skip (Parser.keyword "port" (ExpectedKeyword "port"))
         |> Parser.skip spaceParser
         |> Parser.keep (SourcePosition.parser lowerCaseVariable)
         |> Parser.skip spaceParser
