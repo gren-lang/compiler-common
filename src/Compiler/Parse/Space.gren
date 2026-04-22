@@ -110,6 +110,7 @@ parseLoop _state =
                 , col = col
                 , value =
                     comment
+                        |> String.dropFirst 2
                         |> String.dropLast 2
                         |> Context.Block
                 }
@@ -120,13 +121,15 @@ parseLoop _state =
                 (Parser.oneOf
                     [ Parser.token "{-|" ExpectedMultiLineOpen
                         |> Parser.andThen (\_ -> Parser.problem ExpectedMultiLineOpen)
-                    , Parser.token "{-" ExpectedMultiLineOpen
+                    , Parser.succeed {}
                     ]
                     |> Parser.backtrackable
                 )
             |> Parser.keep
-                (Parser.chompUntil "-}" ExpectedMultiLineClose
-                    |> Parser.skip (Parser.token "-}" ExpectedMultiLineClose)
+                (Parser.multiComment
+                    { string = "{-", expecting = ExpectedMultiLineOpen }
+                    { string = "-}", expecting = ExpectedMultiLineClose }
+                    Parser.Nestable
                     |> Parser.getChompedString
                 )
             |> Parser.andThen

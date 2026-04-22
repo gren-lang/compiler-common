@@ -146,17 +146,25 @@ docParser toErr =
     Parser.oneOf
         [ Parser.succeed
             (\docStart doc docEnd ->
+                let
+                    trimmedDoc =
+                        doc
+                            |> String.dropFirst 3
+                            |> String.dropLast 2
+                in
                 Just <|
-                    SourcePosition.at docStart docEnd doc
+                    SourcePosition.at docStart docEnd trimmedDoc
             )
             |> Parser.keep Parser.getPosition
-            |> Parser.skip (Parser.token "{-|" (toErr "{-|"))
             |> Parser.keep
-                (Parser.mapError spaceErr Space.parser
-                    |> Parser.skip (Parser.chompUntil "-}" (toErr "-}"))
+                (Parser.multiComment
+                    -- Since Space.parser has run before this parser, we can assume
+                    -- that {- means {-|
+                    { string = "{-", expecting = toErr "{-|" }
+                    { string = "-}", expecting = toErr "-}" }
+                    Parser.Nestable
                     |> Parser.getChompedString
                 )
-            |> Parser.skip (Parser.token "-}" (toErr "-}"))
             |> Parser.keep Parser.getPosition
             |> Parser.skip (Parser.mapError spaceErr Space.parser)
         , Parser.succeed Nothing

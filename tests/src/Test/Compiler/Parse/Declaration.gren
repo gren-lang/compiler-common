@@ -76,6 +76,41 @@ tests =
                                     )
                             }
                         )
+            , test "With nested doc comment" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| Docs for {- Name -}
+                    -}
+                    type alias Name = String
+                    """
+                    |> expectDoc
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 2, col = 3 }
+                            " Docs for {- Name -}\n"
+                        )
+                        (PD.Alias
+                            { name =
+                                SourcePosition.at
+                                    { row = 3, col = 12 }
+                                    { row = 3, col = 16 }
+                                    "Name"
+                            , vars = []
+                            , type_ =
+                                SourcePosition.at
+                                    { row = 3, col = 19 }
+                                    { row = 3, col = 25 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 3, col = 19 }
+                                                { row = 3, col = 25 }
+                                                "String"
+                                        , args = []
+                                        }
+                                    )
+                            }
+                        )
             , test "Args" <| \_ ->
                 Parser.run PD.parser Context.empty
                     """

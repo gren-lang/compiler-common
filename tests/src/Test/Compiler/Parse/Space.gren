@@ -51,6 +51,9 @@ tests =
         , test "block comments" <| \_ ->
             Parser.run (parseToEnd payloadParser) Context.empty "{- this is a block comment -}"
                 |> expectComment 1 1 (Context.Block " this is a block comment ")
+        , test "nested block comment" <| \_ ->
+            Parser.run (parseToEnd payloadParser) Context.empty "{- checks for --, {- -} and {-| -} comments. -}"
+                |> expectComment 1 1 (Context.Block " checks for --, {- -} and {-| -} comments. ")
         ]
     , describe "checkIndent" <|
         let
