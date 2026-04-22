@@ -100,9 +100,13 @@ coreParser =
                                     let
                                         character =
                                             Char.fromCode num
+
+                                        replacementCode =
+                                            Char.toCode '\u{FFFD}'
                                     in
-                                    -- Check if char is valid (replacement character)
-                                    if character == '\u{FFFD}' then
+                                    -- When converting from char code, we will get the replacement character
+                                    -- if the conversion fails. The replacement character itself is valid unicode
+                                    if Char.toCode character == replacementCode && num /= replacementCode then
                                         Parser.problem ExpectedValidUnicode
 
                                     else

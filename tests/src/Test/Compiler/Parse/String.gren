@@ -33,8 +33,11 @@ tests =
                 Parser.run PS.char Context.empty ("\'" ++ String.fromChar char ++ "\'")
                     |> Expect.equal (Ok char)
             , test "Unicode character requiring surrogate pairs, using escape sequence" <| \_ ->
-                Parser.run PS.char Context.empty ("\'\\u{10437}\'")
+                Parser.run PS.char Context.empty "\'\\u{10437}\'"
                     |> Expect.equal (Ok '𐐷')
+            , test "Replacement character is valid unicode" <| \_ ->
+                Parser.run PS.char Context.empty "\'\\u{FFFD}\'"
+                    |> Expect.equal (Ok '\u{FFFD}')
             , test "Escape newline" <| \_ ->
                 Parser.run PS.char Context.empty "\'\\n\'"
                     |> Expect.equal (Ok '\n')
