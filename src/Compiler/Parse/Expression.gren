@@ -306,42 +306,50 @@ letDefNamedParser =
         |> Parser.andThen
             (\var ->
                 Parser.succeed
-                    (\signature args body ->
-                        let
-                            bodyEnd =
-                                body.end
-                        in
-                        SourcePosition.at
-                            var.start
-                            bodyEnd
-                            { name = var
-                            , args = args
-                            , body = body
-                            , typeSignature = signature
-                            }
+                    (\maybeSignature args body ->
+                        when maybeSignature is
+                            Just { tipe, realVar } ->
+                                SourcePosition.at
+                                    var.start
+                                    body.end
+                                    { name = realVar
+                                    , args = args
+                                    , body = body
+                                    , typeSignature = Just tipe
+                                    }
+
+                            Nothing ->
+                                SourcePosition.at
+                                    var.start
+                                    body.end
+                                    { name = var
+                                    , args = args
+                                    , body = body
+                                    , typeSignature = Nothing
+                                    }
                     )
                     |> Parser.keep
                         (Parser.oneOf
-                            [ Parser.succeed Just
+                            [ Parser.succeed (\t rv -> Just { tipe = t, realVar = rv })
                                 |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
                                 |> Parser.skip spaceParser
                                 |> Parser.keep
                                     (Type.expression
                                         |> Parser.mapError TypeError
                                     )
-                                |> Parser.skip
-                                    ( lowerCaseVariable
+                                |> Parser.keep
+                                    ( SourcePosition.parser lowerCaseVariable
                                         |> Parser.andThen
                                             (\var2 ->
-                                                if var.value /= var2 then
+                                                if var.value /= var2.value then
                                                     Parser.problem <|
                                                         NameMismatch
                                                             { first = var.value
-                                                            , second = var2
+                                                            , second = var2.value
                                                             }
 
                                                 else
-                                                    Parser.succeed {}
+                                                    Parser.succeed var2
                                             )
                             
                                     )

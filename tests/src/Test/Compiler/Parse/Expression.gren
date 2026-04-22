@@ -1716,8 +1716,8 @@ tests =
                                         (AST.Define
                                             { name =
                                                 SourcePosition.at
-                                                    { row = 2, col = 5 }
-                                                    { row = 2, col = 11 }
+                                                    { row = 3, col = 5 }
+                                                    { row = 3, col = 11 }
                                                     "number"
                                             , args = []
                                             , typeSignature =

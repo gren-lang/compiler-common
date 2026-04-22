@@ -391,8 +391,8 @@ tests =
                         (PD.Value
                             { name =
                                 SourcePosition.at
-                                    { row = 1, col = 1 }
-                                    { row = 1, col = 4 }
+                                    { row = 2, col = 1 }
+                                    { row = 2, col = 4 }
                                     "foo"
                             , signature =
                                 Just <|
@@ -434,8 +434,8 @@ tests =
                         (PD.Value
                             { name =
                                 SourcePosition.at
-                                    { row = 3, col = 1 }
-                                    { row = 3, col = 4 }
+                                    { row = 4, col = 1 }
+                                    { row = 4, col = 4 }
                                     "foo"
                             , signature =
                                 Just <|

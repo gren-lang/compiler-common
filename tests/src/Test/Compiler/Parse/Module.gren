@@ -471,14 +471,14 @@ tests =
                      , imports = []
                      , values =
                           [ SourcePosition.at
-                              { row = 3, col = 1 }
+                              { row = 4, col = 1 }
                               { row = 4, col = 9 }
                               { docs = Nothing
                               , value =
                                   { name =
                                       SourcePosition.at
-                                          { row = 3, col = 1 }
-                                          { row = 3, col = 4 }
+                                          { row = 4, col = 1 }
+                                          { row = 4, col = 4 }
                                           "num"
                                   , signature =
                                       Just <|
@@ -689,14 +689,14 @@ tests =
                     , effects = AST.NoEffects
                     , values =
                         [ SourcePosition.at
-                                { row = 3, col = 1 }
+                                { row = 4, col = 1 }
                                 { row = 8, col = 21 }
                                 { docs = Nothing
                                 , value =
                                     { name =
                                         SourcePosition.at
-                                            { row = 3, col = 1 }
-                                            { row = 3, col = 4 }
+                                            { row = 4, col = 1 }
+                                            { row = 4, col = 4 }
                                             "foo"
                                     , signature =
                                         Just
@@ -789,14 +789,14 @@ tests =
                                     }
                                 }
                             , SourcePosition.at
-                                { row = 10, col = 1 }
+                                { row = 11, col = 1 }
                                 { row = 12, col = 21 }
                                 { docs = Nothing
                                 , value =
                                     { name =
                                         SourcePosition.at
-                                            { row = 10, col = 1 }
-                                            { row = 10, col = 4 }
+                                            { row = 11, col = 1 }
+                                            { row = 11, col = 4 }
                                             "bar"
                                     , signature =
                                         Just

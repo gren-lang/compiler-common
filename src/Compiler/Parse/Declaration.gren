@@ -108,6 +108,8 @@ parser =
                     |> Parser.mapError ExprError
                     |> Parser.map
                         (\def ->
+                            -- TODO: def.start is discarded without a way to re-create
+                            -- Fixing is likely breaking change
                             Value
                                 { name = def.value.name
                                 , signature = def.value.typeSignature
