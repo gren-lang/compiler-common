@@ -566,6 +566,41 @@ tests =
                                     )
                             }
                         )
+            , test "operators with negated left var" <| \_ ->
+                Parser.run PE.parser Context.empty
+                    """
+                    (-a + b)
+                    """
+                    |> expectExpression
+                        (AST.Parens <|
+                            SourcePosition.at
+                                { row = 1, col = 2 }
+                                { row = 1, col = 8 }
+                                (AST.Binops
+                                    { left =
+                                        SourcePosition.at
+                                            { row = 1, col = 2 }
+                                            { row = 1, col = 4 }
+                                            (AST.Negate
+                                                (SourcePosition.at
+                                                    { row = 1, col = 3 }
+                                                    { row = 1, col = 4 }
+                                                    (AST.Var { name = "a", varType = AST.LowVar })
+                                                )
+                                            )
+                                    , operator =
+                                        SourcePosition.at
+                                            { row = 1, col = 5 }
+                                            { row = 1, col = 6 }
+                                            "+"
+                                    , right =
+                                        SourcePosition.at
+                                            { row = 1, col = 7 }
+                                            { row = 1, col = 8 }
+                                            (AST.Var { name = "b", varType = AST.LowVar })
+                                    }
+                                )
+                        )
             , test "operators over multiple lines without indent" <| \_ ->
                 Parser.run PE.parser Context.empty
                     """
