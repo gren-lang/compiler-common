@@ -52,7 +52,7 @@ tests =
                         (SourcePosition.at
                             { row = 1, col = 1 }
                             { row = 2, col = 3 }
-                            "Docs for Name"
+                            " Docs for Name\n"
                         )
                         (PD.Alias
                             { name =
@@ -206,7 +206,7 @@ tests =
                         (SourcePosition.at
                             { row = 1, col = 1 }
                             { row = 2, col = 3 }
-                            "Docs for union"
+                            " Docs for union\n"
                         )
                         (PD.Union
                             { name =
@@ -364,7 +364,7 @@ tests =
                         (SourcePosition.at
                             { row = 1, col = 1 }
                             { row = 2, col = 3 }
-                            "value test"
+                            " value test\n"
                         )
                         (PD.Value
                             { name =
@@ -429,7 +429,7 @@ tests =
                         (SourcePosition.at
                             { row = 1, col = 1 }
                             { row = 2, col = 3 }
-                            "Function docs"
+                            " Function docs\n"
                         )
                         (PD.Value
                             { name =

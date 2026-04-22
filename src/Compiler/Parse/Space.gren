@@ -81,7 +81,6 @@ parseLoop _state =
                 , value =
                     comment
                         |> String.dropFirst 2
-                        |> String.trim
                         |> Context.Line
                 }
             )
@@ -112,7 +111,6 @@ parseLoop _state =
                 , value =
                     comment
                         |> String.dropLast 2
-                        |> String.trim
                         |> Context.Block
                 }
             )
