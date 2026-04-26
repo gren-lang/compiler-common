@@ -467,9 +467,18 @@ declarationToModuleValue : Declaration -> Maybe (AST.ModuleDeclaration AST.Value
 declarationToModuleValue decl =
     when decl.value is
         Declaration.Value v ->
+            let
+                start =
+                    when v.signature is
+                        Nothing ->
+                            v.name.start
+
+                        Just ts ->
+                            ts.start
+            in
             Just <|
                 SourcePosition.at
-                    v.name.start
+                    start
                     v.body.end
                     { docs = decl.docs
                     , value = v

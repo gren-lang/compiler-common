@@ -108,11 +108,16 @@ parser =
                     |> Parser.mapError ExprError
                     |> Parser.map
                         (\def ->
-                            -- TODO: def.start is discarded without a way to re-create
-                            -- Fixing is likely breaking change
                             Value
                                 { name = def.value.name
-                                , signature = def.value.typeSignature
+                                , signature =
+                                    Maybe.map
+                                        (\t ->
+                                            { start = def.start
+                                            , type_ = t
+                                            }
+                                        )
+                                        def.value.typeSignature
                                 , args = def.value.args
                                 , body = def.value.body
                                 }

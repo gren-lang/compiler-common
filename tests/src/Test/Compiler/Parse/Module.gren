@@ -471,7 +471,7 @@ tests =
                      , imports = []
                      , values =
                           [ SourcePosition.at
-                              { row = 4, col = 1 }
+                              { row = 3, col = 1 }
                               { row = 4, col = 9 }
                               { docs = Nothing
                               , value =
@@ -481,19 +481,23 @@ tests =
                                           { row = 4, col = 4 }
                                           "num"
                                   , signature =
-                                      Just <|
-                                          SourcePosition.at
-                                              { row = 3, col = 7 }
-                                              { row = 3, col = 10 }
-                                              (AST.TType
-                                                  { name =
-                                                      SourcePosition.at
-                                                          { row = 3, col = 7 }
-                                                          { row = 3, col = 10 }
-                                                          "Int"
-                                                  , args = []
-                                                  }
-                                              )
+                                      Just
+                                          { start =
+                                              { row = 3, col = 1 }
+                                          , type_ =
+                                              SourcePosition.at
+                                                  { row = 3, col = 7 }
+                                                  { row = 3, col = 10 }
+                                                  (AST.TType
+                                                      { name =
+                                                          SourcePosition.at
+                                                              { row = 3, col = 7 }
+                                                              { row = 3, col = 10 }
+                                                              "Int"
+                                                      , args = []
+                                                      }
+                                                  )
+                                          }
                                   , args = []
                                   , body =
                                       SourcePosition.at
@@ -689,7 +693,7 @@ tests =
                     , effects = AST.NoEffects
                     , values =
                         [ SourcePosition.at
-                                { row = 4, col = 1 }
+                                { row = 3, col = 1 }
                                 { row = 8, col = 21 }
                                 { docs = Nothing
                                 , value =
@@ -700,39 +704,42 @@ tests =
                                             "foo"
                                     , signature =
                                         Just
-                                            (SourcePosition.at
-                                                { row = 3, col = 7 }
-                                                { row = 3, col = 20 }
-                                                (AST.TLambda
-                                                    { from =
-                                                        SourcePosition.at
-                                                            { row = 3, col = 7 }
-                                                            { row = 3, col = 10 }
-                                                            (AST.TType
-                                                                { name =
-                                                                    SourcePosition.at
-                                                                        { row = 3, col = 7 }
-                                                                        { row = 3, col = 10 }
-                                                                        "Int"
-                                                                , args = []
-                                                                }
-                                                            )
-                                                    , to =
-                                                        SourcePosition.at
-                                                            { row = 3, col = 14 }
-                                                            { row = 3, col = 20 }
-                                                            (AST.TType
-                                                                { name =
-                                                                    SourcePosition.at
-                                                                        { row = 3, col = 14 }
-                                                                        { row = 3, col = 20 }
-                                                                        "String"
-                                                                , args = []
-                                                                }
-                                                            )
-                                                    }
-                                                )
-                                            )
+                                            { start =
+                                                { row = 3, col = 1 }
+                                            , type_ =
+                                                SourcePosition.at
+                                                    { row = 3, col = 7 }
+                                                    { row = 3, col = 20 }
+                                                    (AST.TLambda
+                                                        { from =
+                                                            SourcePosition.at
+                                                                { row = 3, col = 7 }
+                                                                { row = 3, col = 10 }
+                                                                (AST.TType
+                                                                    { name =
+                                                                        SourcePosition.at
+                                                                            { row = 3, col = 7 }
+                                                                            { row = 3, col = 10 }
+                                                                            "Int"
+                                                                    , args = []
+                                                                    }
+                                                                )
+                                                        , to =
+                                                            SourcePosition.at
+                                                                { row = 3, col = 14 }
+                                                                { row = 3, col = 20 }
+                                                                (AST.TType
+                                                                    { name =
+                                                                        SourcePosition.at
+                                                                            { row = 3, col = 14 }
+                                                                            { row = 3, col = 20 }
+                                                                            "String"
+                                                                    , args = []
+                                                                    }
+                                                                )
+                                                        }
+                                                    )
+                                            }
                                     , args =
                                         [ SourcePosition.at
                                             { row = 4, col = 5 }
@@ -789,7 +796,7 @@ tests =
                                     }
                                 }
                             , SourcePosition.at
-                                { row = 11, col = 1 }
+                                { row = 10, col = 1 }
                                 { row = 12, col = 21 }
                                 { docs = Nothing
                                 , value =
@@ -800,39 +807,42 @@ tests =
                                             "bar"
                                     , signature =
                                         Just
-                                            (SourcePosition.at
-                                                { row = 10, col = 7 }
-                                                { row = 10, col = 20 }
-                                                (AST.TLambda
-                                                    { from =
-                                                        SourcePosition.at
-                                                            { row = 10, col = 7 }
-                                                            { row = 10, col = 10 }
-                                                            (AST.TType
-                                                                { name =
-                                                                    SourcePosition.at
-                                                                        { row = 10, col = 7 }
-                                                                        { row = 10, col = 10 }
-                                                                        "Int"
-                                                                , args = []
-                                                                }
-                                                            )
-                                                    , to =
-                                                        SourcePosition.at
-                                                            { row = 10, col = 14 }
-                                                            { row = 10, col = 20 }
-                                                            (AST.TType
-                                                                { name =
-                                                                    SourcePosition.at
-                                                                        { row = 10, col = 14 }
-                                                                        { row = 10, col = 20 }
-                                                                        "String"
-                                                                , args = []
-                                                                }
-                                                            )
-                                                    }
-                                                )
-                                            )
+                                            { start =
+                                                { row = 10, col = 1 }
+                                            , type_ =
+                                                SourcePosition.at
+                                                    { row = 10, col = 7 }
+                                                    { row = 10, col = 20 }
+                                                    (AST.TLambda
+                                                        { from =
+                                                            SourcePosition.at
+                                                                { row = 10, col = 7 }
+                                                                { row = 10, col = 10 }
+                                                                (AST.TType
+                                                                    { name =
+                                                                        SourcePosition.at
+                                                                            { row = 10, col = 7 }
+                                                                            { row = 10, col = 10 }
+                                                                            "Int"
+                                                                    , args = []
+                                                                    }
+                                                                )
+                                                        , to =
+                                                            SourcePosition.at
+                                                                { row = 10, col = 14 }
+                                                                { row = 10, col = 20 }
+                                                                (AST.TType
+                                                                    { name =
+                                                                        SourcePosition.at
+                                                                            { row = 10, col = 14 }
+                                                                            { row = 10, col = 20 }
+                                                                            "String"
+                                                                    , args = []
+                                                                    }
+                                                                )
+                                                        }
+                                                    )
+                                            }
                                     , args =
                                         [ SourcePosition.at
                                             { row = 11, col = 5 }

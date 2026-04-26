@@ -274,7 +274,11 @@ type alias UnionVariant =
 -}
 type alias Value =
   { name : SourcePosition.Located String
-  , signature : Maybe Type
+  , signature :
+    Maybe
+      { start : SourcePosition.Position
+      , type_ : SourcePosition.Located Type_
+      }
   , args : Array Pattern
   , body : Expression
   }
