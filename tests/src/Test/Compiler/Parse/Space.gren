@@ -6,6 +6,8 @@ import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Parse.Space as PS
 import Compiler.Parse.Context as Context exposing (Context)
 import Dict
+import SourcePosition
+import Array.Builder
 
 
 tests : Test
@@ -44,16 +46,36 @@ tests =
     , describe "comments" <|
         [ test "parses line comments" <| \_ ->
             Parser.run (parseToEnd payloadParser) Context.empty "-- this is a line comment"
-                |> expectComment 1 1 (Context.Line " this is a line comment")
+                |> expectComment
+                    (SourcePosition.at
+                        { row = 1, col = 1 }
+                        { row = 1, col = 26 }
+                        (Context.Line " this is a line comment" )
+                    )
         , test "parses line comments even when prefixed with space" <| \_ ->
             Parser.run (parseToEnd payloadParser) Context.empty "  -- this is a line comment"
-                |> expectComment 1 3 (Context.Line " this is a line comment")
+                |> expectComment
+                    (SourcePosition.at
+                        { row = 1, col = 3 }
+                        { row = 1, col = 28 }
+                        (Context.Line " this is a line comment")
+                    )
         , test "block comments" <| \_ ->
             Parser.run (parseToEnd payloadParser) Context.empty "{- this is a block comment -}"
-                |> expectComment 1 1 (Context.Block " this is a block comment ")
+                |> expectComment
+                    (SourcePosition.at
+                        { row = 1, col = 1 }
+                        { row = 1, col = 30 }
+                        (Context.Block " this is a block comment ")
+                    )
         , test "nested block comment" <| \_ ->
             Parser.run (parseToEnd payloadParser) Context.empty "{- checks for --, {- -} and {-| -} comments. -}"
-                |> expectComment 1 1 (Context.Block " checks for --, {- -} and {-| -} comments. ")
+                |> expectComment
+                    (SourcePosition.at
+                        { row = 1, col = 1 }
+                        { row = 1, col = 48 }
+                        (Context.Block " checks for --, {- -} and {-| -} comments. ")
+                    )
         ]
     , describe "checkIndent" <|
         let
@@ -109,25 +131,14 @@ parseToEnd p =
     Parser.skip (Parser.end PS.InvalidWhiteSpace) p
 
 
-expectComment : Int -> Int -> Context.CommentValue -> Result x Context -> Expectation
-expectComment row col comment resultContext =
+expectComment : SourcePosition.Located Context.Comment -> Result x Context -> Expectation
+expectComment comment resultContext =
     when resultContext is
         Err err ->
             Expect.fail ("Failed to parse with error: " ++ Debug.toString err)
 
         Ok ctx ->
-            when Dict.get row ctx.comments is
-                Nothing ->
-                    Expect.fail "Parsed successfully without comments"
-
-                Just commentsOnRow ->
-                    Expect.equal
-                        [ { row = row
-                          , col = col
-                          , value = comment
-                          }
-                        ]
-                        commentsOnRow
+            Expect.equal [ comment ] (Array.Builder.toArray ctx.comments)
 
 
 expectLineStart : Int -> Result x Context -> Expectation

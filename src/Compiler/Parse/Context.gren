@@ -2,8 +2,7 @@ module Compiler.Parse.Context exposing
     ( Context
     --
     , empty
-    , Comment
-    , CommentValue (..)
+    , Comment (..)
     )
 
 
@@ -20,6 +19,8 @@ or generating code.
 -}
 
 import Dict exposing (Dict)
+import Array.Builder exposing (Builder)
+import SourcePosition
 
 
 {-| The "hidden" state of a parser when parsing Gren code.
@@ -31,7 +32,7 @@ import Dict exposing (Dict)
 type alias Context =
     { indent : Int
     , lineStart : Int
-    , comments : Dict Int (Array Comment)
+    , comments : Builder (SourcePosition.Located Comment)
     }
 
 
@@ -41,21 +42,12 @@ empty : Context
 empty =
     { indent = 1
     , lineStart = 1
-    , comments = Dict.empty
-    }
-
-
-{-| A comment along with it's start position in the file.
--}
-type alias Comment =
-    { row : Int
-    , col : Int
-    , value : CommentValue
+    , comments = Array.Builder.empty 0
     }
 
 
 {-| There are two types of comments. Line- and block-comments.
 -}
-type CommentValue
+type Comment
     = Line String
     | Block String
