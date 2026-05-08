@@ -20,6 +20,7 @@ import Test.Compiler.Parse.LongExpression
 import Test.Compiler.Parse.Type
 import Test.Compiler.Parse.Declaration
 import Test.Compiler.Parse.Module
+import Test.Compiler.Canonicalize.Module
 
 
 main : TestRunner.Program
@@ -44,4 +45,5 @@ main =
             , Test.Compiler.Parse.Type.tests
             , Test.Compiler.Parse.Declaration.tests
             , Test.Compiler.Parse.Module.tests
+            , Test.Compiler.Canonicalize.Module.tests
             ]

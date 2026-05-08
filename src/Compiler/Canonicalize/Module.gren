@@ -1,0 +1,150 @@
+module Compiler.Canonicalize.Module exposing
+    ( SourceModule
+    , Error (..)
+    , canonicalize
+    )
+
+import Compiler.Ast.Source as ParseAst
+import Compiler.Ast.Canonical as CanonicalAst
+import Compiler.Canonicalize.Expression as Expression
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Compiler.ModuleName as ModuleName exposing (ModuleName)
+import Compiler.SourcePosition as SourcePosition
+import Compiler.Parse.Number as Number
+import Dict exposing (Dict)
+import Array
+
+
+type alias SourceModule =
+    { package : PackageName
+    , ast : ParseAst.Module
+    }
+
+
+type Error
+    = PlaceholderError
+    | InvalidModuleName String
+    | ExpressionError Expression.Error
+
+
+{-| Canonicalize exports from a module.
+-}
+canonicalizeExports : ParseAst.Exposing -> SourcePosition.Region -> Result Error CanonicalAst.Exports
+canonicalizeExports exposings region =
+    when exposings is
+        ParseAst.Open ->
+            Ok (CanonicalAst.ExportEverything region)
+
+        ParseAst.Explicit _ ->
+            Err PlaceholderError
+
+
+{-| Canonicalize a single definition (value).
+For now, only handles simple definitions without type signatures and with literal bodies.
+-}
+canonicalizeDef : ParseAst.Value -> Result Error CanonicalAst.Def
+canonicalizeDef value =
+    when value.signature is
+        Nothing ->
+            Expression.canonicalize value.body
+                |> Result.mapError ExpressionError
+                |> Result.map
+                    (\canonBody ->
+                        CanonicalAst.Def
+                            { name = value.name
+                            , params = []
+                            , body = canonBody
+                            }
+                    )
+
+        Just _ ->
+            Err PlaceholderError
+
+
+{-| Canonicalize effects.
+-}
+canonicalizeEffects : ParseAst.Effects -> Result Error CanonicalAst.Effects
+canonicalizeEffects effects =
+    when effects is
+        ParseAst.NoEffects ->
+            Ok CanonicalAst.NoEffects
+
+        _ ->
+            Err PlaceholderError
+
+
+{-| Canonicalize a full module.
+For now, only handles Implementation modules with a single value definition.
+-}
+canonicalizeModule : PackageName -> SourceModule -> Dict String CanonicalAst.Module -> Result Error CanonicalAst.Module
+canonicalizeModule pkg parsedModule modules =
+    when parsedModule.ast is
+        ParseAst.Implementation impl ->
+            when ModuleName.fromString impl.name.value is
+                Just moduleName ->
+                    let
+                        exportsResult =
+                            canonicalizeExports impl.exports { start = impl.name.start, end = impl.name.end }
+
+                        effectsResult =
+                            canonicalizeEffects impl.effects
+                    in
+                    Result.map2
+                        (\canonicalExports canonicalEffects ->
+                            -- Handle only the case with a single value, no unions, aliases, binops
+                            if Array.length impl.values == 1
+                                && Array.isEmpty impl.unions
+                                && Array.isEmpty impl.aliases
+                                && Array.isEmpty impl.binops then
+                                when Array.get 0 impl.values is
+                                    Just singleValueDecl ->
+                                        canonicalizeDef singleValueDecl.value.value
+                                            |> Result.map
+                                                (\canonDef ->
+                                                    { name = moduleName
+                                                    , exports = canonicalExports
+                                                    , decls = CanonicalAst.Declare { def = canonDef, decls = CanonicalAst.SaveTheEnvironment }
+                                                    , unions = Dict.empty
+                                                    , aliases = Dict.empty
+                                                    , binops = Dict.empty
+                                                    , effects = canonicalEffects
+                                                    }
+                                                )
+
+                                    Nothing ->
+                                        Err PlaceholderError
+
+                            else
+                                Err PlaceholderError
+                        )
+                        exportsResult
+                        effectsResult
+                        |> Result.andThen Basics.identity
+
+                Nothing ->
+                    Err (InvalidModuleName impl.name.value)
+
+        ParseAst.Signature _ ->
+            Err PlaceholderError
+
+
+{-| Takes in a `Dict` of parsed modules, where the `String` key represents a module name, and returns
+a `Dict` of canonicalized modules, or `Error`
+-}
+canonicalize : PackageName -> Dict String SourceModule -> Dict String CanonicalAst.Module -> Result Error (Dict String CanonicalAst.Module)
+canonicalize pkg parsedModules modules =
+    Dict.foldl
+        (\key parsedModule resultAcc ->
+            let
+                canonResult =
+                    canonicalizeModule pkg parsedModule modules
+            in
+            Result.map2
+                (\canonModule existingDict ->
+                    Dict.set key canonModule existingDict
+                )
+                canonResult
+                resultAcc
+        )
+        (Ok Dict.empty)
+        parsedModules

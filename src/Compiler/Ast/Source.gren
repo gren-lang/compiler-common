@@ -24,6 +24,7 @@ module Compiler.Ast.Source exposing
     , ModuleImplementation
     , ModuleSignature
     , ModuleDeclaration
+    , moduleName
     , Exposing (..)
     , Exposed (..)
     , Privacy (..)
@@ -346,6 +347,16 @@ type alias ModuleSignature =
   , values : Array (ModuleDeclaration ValueSignature)
   , types : Array (ModuleDeclaration TypeSignature)
   }
+
+
+moduleName : Module -> SourcePosition.Located String
+moduleName mod =
+  when mod is
+    Implementation impl ->
+      impl.name
+
+    Signature sig ->
+      sig.name
 
 
 {-|

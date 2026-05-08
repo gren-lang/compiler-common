@@ -13,6 +13,8 @@
         "Compiler.PackageName",
         "Compiler.Platform",
         "Compiler.License",
+        "Compiler.Canonicalize.Module",
+        "Compiler.Canonicalize.Expression",
         "Compiler.Parse.Context",
         "Compiler.Parse.Declaration",
         "Compiler.Parse.Expression",

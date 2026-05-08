@@ -1,0 +1,41 @@
+module Compiler.Canonicalize.Expression exposing
+    ( Error (..)
+    , canonicalize
+    )
+
+
+import Compiler.Ast.Source as ParseAst
+import Compiler.Ast.Canonical as CanonicalAst
+import Compiler.Parse.Number as Number
+import Compiler.SourcePosition as SourcePosition
+
+
+type Error
+    = PlaceholderError
+
+
+{-| Canonicalize a single expression.
+For now, only handles NumberLiteral with Integer.
+-}
+canonicalize : ParseAst.Expression -> Result Error CanonicalAst.Expression
+canonicalize expr =
+    canonicalize_ expr.value
+        |> Result.map (SourcePosition.at expr.start expr.end)
+
+
+canonicalize_ : ParseAst.Expression_ -> Result Error CanonicalAst.Expression_
+canonicalize_ expr =
+    when expr is
+        ParseAst.NumberLiteral numberOutcome ->
+            when numberOutcome is
+                Number.Integer intVal ->
+                    Ok (CanonicalAst.Int intVal)
+
+                Number.FloatingPoint floatVal ->
+                    Ok (CanonicalAst.Float floatVal)
+
+                Number.Hex hexVal ->
+                    Ok (CanonicalAst.Int hexVal)
+
+        _ ->
+            Err PlaceholderError
