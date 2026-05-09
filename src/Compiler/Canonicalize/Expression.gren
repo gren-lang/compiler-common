@@ -15,7 +15,12 @@ type Error
 
 
 {-| Canonicalize a single expression.
-For now, only handles NumberLiteral with Integer.
+Handles:
+- NumberLiteral (Integer, FloatingPoint, Hex)
+- CharLiteral
+- StringLiteral
+- Accessor
+- Parens (unwrapped)
 -}
 canonicalize : ParseAst.Expression -> Result Error CanonicalAst.Expression
 canonicalize expr =
@@ -36,6 +41,18 @@ canonicalize_ expr =
 
                 Number.Hex hexVal ->
                     Ok (CanonicalAst.Int hexVal)
+
+        ParseAst.CharLiteral char ->
+            Ok (CanonicalAst.Chr char)
+
+        ParseAst.StringLiteral str ->
+            Ok (CanonicalAst.Str str)
+
+        ParseAst.Accessor str ->
+            Ok (CanonicalAst.Accessor str)
+
+        ParseAst.Parens innerExpr ->
+            canonicalize_ innerExpr.value
 
         _ ->
             Err PlaceholderError

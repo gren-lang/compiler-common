@@ -1,0 +1,45 @@
+module Test.Compiler.Canonicalize.Expression exposing (tests)
+
+import Compiler.Canonicalize.Expression as Canonicalize
+import Compiler.Ast.Canonical as CanonicalAst
+import Compiler.Parse.Expression as ExpressionParser
+import Compiler.Parse.Context as Context exposing (Context)
+import Compiler.SourcePosition as SourcePosition
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import String.Parser.Advanced as Parser
+
+
+tests : Test
+tests =
+    describe "Compiler.Canonicalize.Expression"
+        [ describe "NumberLiteral (current implementation)"
+            [ test "Integer" <| \_ -> expectCanonicalizeStr "42" (CanonicalAst.Int 42)
+            , test "FloatingPoint" <| \_ -> expectCanonicalizeStr "3.14" (CanonicalAst.Float 3.14)
+            , test "Hex" <| \_ -> expectCanonicalizeStr "0xFF" (CanonicalAst.Int 255)
+            ]
+        , describe "Simple 1:1 mappings"
+            [ test "CharLiteral" <| \_ -> expectCanonicalizeStr "'x'" (CanonicalAst.Chr 'x')
+            , test "StringLiteral" <| \_ -> expectCanonicalizeStr "\"hello\"" (CanonicalAst.Str "hello")
+            , test "Accessor" <| \_ -> expectCanonicalizeStr ".field" (CanonicalAst.Accessor "field")
+            , test "Parens" <| \_ -> expectCanonicalizeStr "(42)" (CanonicalAst.Int 42)
+            ]
+        ]
+
+
+expectCanonicalizeStr : String -> CanonicalAst.Expression_ -> Expectation
+expectCanonicalizeStr source expectedInner =
+    when Parser.run ExpressionParser.parser Context.empty source is
+        Err parseErrs ->
+            Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+
+        Ok parsedExpr ->
+            when Canonicalize.canonicalize parsedExpr is
+                Ok actual ->
+                    let
+                        expected = SourcePosition.at parsedExpr.start parsedExpr.end expectedInner
+                    in
+                    Expect.equal expected actual
+
+                Err err ->
+                    Expect.fail ("Canonicalization failed: " ++ Debug.toString err)
