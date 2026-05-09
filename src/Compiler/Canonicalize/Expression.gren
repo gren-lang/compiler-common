@@ -1,6 +1,9 @@
 module Compiler.Canonicalize.Expression exposing
-    ( Error (..)
+    ( Context
+    , Error (..)
     , canonicalize
+    , canonicalizePattern
+    , canonicalizeLetDef
     )
 
 
@@ -8,10 +11,25 @@ import Compiler.Ast.Source as ParseAst
 import Compiler.Ast.Canonical as CanonicalAst
 import Compiler.Parse.Number as Number
 import Compiler.SourcePosition as SourcePosition
+import Compiler.ModuleName as ModuleName exposing (ModuleName)
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Dict exposing (Dict)
+import Set exposing (Set)
 
 
 type Error
     = PlaceholderError
+    | InvalidModuleName String
+    | ModuleNotFound String
+    | UnknownVar String
+
+
+type alias Context =
+    { pkg : PackageName
+    , currentModule : ModuleName
+    , modules : Dict String CanonicalAst.Module
+    , scope : Set String
+    }
 
 
 {-| Canonicalize a single expression.
@@ -21,15 +39,18 @@ Handles:
 - StringLiteral
 - Accessor
 - Parens (unwrapped)
+- VarQual (qualified variables)
+- Var (local variables in Let scope)
+- Let/LetRec expressions
 -}
-canonicalize : ParseAst.Expression -> Result Error CanonicalAst.Expression
-canonicalize expr =
-    canonicalize_ expr.value
+canonicalize : Context -> ParseAst.Expression -> Result Error CanonicalAst.Expression
+canonicalize context expr =
+    canonicalize_ context expr.value
         |> Result.map (SourcePosition.at expr.start expr.end)
 
 
-canonicalize_ : ParseAst.Expression_ -> Result Error CanonicalAst.Expression_
-canonicalize_ expr =
+canonicalize_ : Context -> ParseAst.Expression_ -> Result Error CanonicalAst.Expression_
+canonicalize_ context expr =
     when expr is
         ParseAst.NumberLiteral numberOutcome ->
             when numberOutcome is
@@ -52,7 +73,166 @@ canonicalize_ expr =
             Ok (CanonicalAst.Accessor str)
 
         ParseAst.Parens innerExpr ->
-            canonicalize_ innerExpr.value
+            canonicalize_ context innerExpr.value
+
+        -- Variable resolution
+        ParseAst.VarQual { qualifier, name } ->
+            if String.startsWith "Gren.Kernel." qualifier then
+                Ok (CanonicalAst.VarKernel { kernelModule = qualifier, name = name })
+
+            else if ModuleName.toString context.currentModule == qualifier then
+                Ok (CanonicalAst.VarTopLevel { home = context.currentModule, name = name })
+
+            else
+                when Dict.get qualifier context.modules is
+                    Just _ ->
+                        when ModuleName.fromString qualifier is
+                            Just moduleName ->
+                                Ok (CanonicalAst.VarTopLevel { home = moduleName, name = name })
+
+                            Nothing ->
+                                Err (InvalidModuleName qualifier)
+
+                    Nothing ->
+                        Err (ModuleNotFound qualifier)
+
+        ParseAst.Var { name } ->
+            if Set.member name context.scope then
+                Ok (CanonicalAst.VarLocal name)
+            else
+                Err (UnknownVar name)
+
+        ParseAst.Let { defs, body } ->
+            -- Collect all definition names to extend the scope
+            let
+                defNames : Array String
+                defNames =
+                    Array.map getLetDefName defs
+
+                extendedScope : Set String
+                extendedScope =
+                    Array.foldl (\name scope -> Set.set name scope) context.scope defNames
+
+                extendedContext : Context
+                extendedContext =
+                    { context | scope = extendedScope }
+
+                -- Canonicalize all definitions with the extended scope
+                canonicalDefsResult : Result Error (Array CanonicalAst.Def)
+                canonicalDefsResult =
+                    Array.foldl
+                        (\def acc ->
+                            Result.andThen
+                                (\currentDefs ->
+                                    Result.map
+                                        (\d -> Array.pushLast d currentDefs)
+                                        (canonicalizeLetDef extendedContext def)
+                                )
+                                acc
+                        )
+                        (Ok [])
+                        defs
+            in
+            Result.andThen
+                (\canonicalDefs ->
+                    -- Canonicalize body with extended scope
+                    Result.andThen
+                        (\canonicalBody ->
+                            if Array.length canonicalDefs == 1 then
+                                when Array.get 0 canonicalDefs is
+                                    Just singleDef ->
+                                        Ok (CanonicalAst.Let
+                                            { def = singleDef
+                                            , body = canonicalBody
+                                            }
+                                        )
+                                    Nothing ->
+                                        Err PlaceholderError
+                            else
+                                Ok (CanonicalAst.LetRec
+                                    { defs = canonicalDefs
+                                    , body = canonicalBody
+                                    }
+                                )
+                        )
+                        (canonicalize extendedContext body)
+                )
+                canonicalDefsResult
 
         _ ->
             Err PlaceholderError
+
+
+-- Helpers
+
+canonicalizePattern : ParseAst.Pattern -> Result Error CanonicalAst.Pattern
+canonicalizePattern pat =
+    when pat.value is
+        ParseAst.PVar name ->
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PVar name))
+
+        _ ->
+            Err PlaceholderError
+
+
+getLetDefName : SourcePosition.Located ParseAst.Def -> String
+getLetDefName def =
+    when def.value is
+        ParseAst.Define record ->
+            record.name.value
+
+        ParseAst.Destruct { pattern, body } ->
+            when pattern.value is
+                ParseAst.PVar name -> name
+                _ -> Debug.todo "Non-PVar destruct patterns not yet supported in Let"
+
+
+canonicalizeLetDef : Context -> SourcePosition.Located ParseAst.Def -> Result Error CanonicalAst.Def
+canonicalizeLetDef context def =
+    when def.value is
+        ParseAst.Define record ->
+            let
+                paramsResult : Result Error (Array CanonicalAst.Pattern)
+                paramsResult =
+                    Array.foldl
+                        (\pat acc ->
+                            Result.andThen
+                                (\currentParams ->
+                                    Result.map
+                                        (\p -> Array.append currentParams [p])
+                                        (canonicalizePattern pat)
+                                )
+                                acc
+                        )
+                        (Ok [])
+                        record.args
+            in
+            Result.map2
+                (\params body ->
+                    CanonicalAst.Def
+                        { name = record.name
+                        , params = params
+                        , body = body
+                        }
+                )
+                paramsResult
+                (canonicalize context record.body)
+
+        ParseAst.Destruct { pattern, body } ->
+            Result.map2
+                (\canonPattern canonBody ->
+                    when pattern.value is
+                        ParseAst.PVar name ->
+                            Ok (CanonicalAst.Def
+                                { name = SourcePosition.at pattern.start pattern.end name
+                                , params = []
+                                , body = canonBody
+                                }
+                            )
+                        _ ->
+                            -- For non-PVar patterns, we'll need more complete pattern support
+                            Err PlaceholderError
+                )
+                (canonicalizePattern pattern)
+                (canonicalize context body)
+                |> Result.andThen Basics.identity
