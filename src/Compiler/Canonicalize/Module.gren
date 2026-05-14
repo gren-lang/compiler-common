@@ -184,7 +184,7 @@ canonicalizeModule pkg parsedModules modules recursionStack sourceModule =
                     { pkg = pkg
                     , currentModule = currentMod
                     , qualifiedVars = Dict.empty
-                    , scope = Set.empty
+                    , scope = Dict.empty
                     }
                     |> Result.map (\canonModule -> Dict.set modName canonModule modulesWithDeps)
             )

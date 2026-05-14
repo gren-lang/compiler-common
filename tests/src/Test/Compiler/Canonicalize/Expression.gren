@@ -210,7 +210,7 @@ tests =
                 let
                     context =
                         moduleContext "Test"
-                            |> withScopedVar "x"
+                            |> withScopedLocal "x"
                 in
                 expectCanonicalize context "x" (CanonicalAst.VarLocal "x")
             , test "Variable not in scope returns error" <| \_ ->
@@ -219,6 +219,60 @@ tests =
                         moduleContext "Test"
                 in
                 expectCanonicalizeError context "unknownVar" (Canonicalize.UnknownVar "unknownVar")
+            ]
+        , describe "Unqualified vars from imports"
+            [ test "VarTopLevel from same package import" <| \_ ->
+                let
+                    context =
+                        packageContext PackageName.core "Test"
+                            |> withScopedImported "map" (qualifiedEntry PackageName.core "Array" dummyAnnotation)
+                in
+                expectCanonicalize context "map"
+                    (CanonicalAst.VarTopLevel
+                        { home = unsafeModuleName "Array"
+                        , name = "map"
+                        }
+                    )
+            , test "VarForeign from foreign package import" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedImported "func" (qualifiedEntry PackageName.node "External" dummyAnnotation)
+                in
+                expectCanonicalize context "func"
+                    (CanonicalAst.VarForeign
+                        { home = unsafeModuleName "External"
+                        , name = "func"
+                        , annotation = dummyAnnotation
+                        }
+                    )
+            , test "VarDebug from Debug module import" <| \_ ->
+                let
+                    context =
+                        packageContext PackageName.core "Test"
+                            |> withScopedImported "log" (qualifiedEntry PackageName.core "Debug" dummyAnnotation)
+                in
+                expectCanonicalize context "log"
+                    (CanonicalAst.VarDebug
+                        { home = unsafeModuleName "Debug"
+                        , name = "log"
+                        , annotation = dummyAnnotation
+                        }
+                    )
+            , test "DuplicateBinding error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeError context "let x = 1 in let x = 2 in x"
+                    (Canonicalize.DuplicateBinding
+                        { name = "x"
+                        , existingPosition =
+                            { start = { row = 1, col = 5 }
+                            , end = { row = 1, col = 6 }
+                            }
+                        }
+                    )
             ]
         ]
 
@@ -279,7 +333,7 @@ packageContext pkg currentModule =
     { pkg = pkg
     , currentModule = unsafeModuleName currentModule
     , qualifiedVars = Dict.empty
-    , scope = Set.empty
+    , scope = Dict.empty
     }
 
 
@@ -326,8 +380,20 @@ dummyAnnotation =
     }
 
 
-withScopedVar : String -> Canonicalize.Context -> Canonicalize.Context
-withScopedVar varName ctx =
+dummyRegion : SourcePosition.Region
+dummyRegion =
+    { start = SourcePosition.emptyPos, end = SourcePosition.emptyPos }
+
+
+withScopedLocal : String -> Canonicalize.Context -> Canonicalize.Context
+withScopedLocal varName ctx =
     { ctx | scope =
-        Set.set varName ctx.scope
+        Dict.set varName (Canonicalize.Local { position = dummyRegion }) ctx.scope
+    }
+
+
+withScopedImported : String -> Canonicalize.QualifiedEntry -> Canonicalize.Context -> Canonicalize.Context
+withScopedImported name entry ctx =
+    { ctx | scope =
+        Dict.set name (Canonicalize.Imported { entry = entry, position = dummyRegion }) ctx.scope
     }

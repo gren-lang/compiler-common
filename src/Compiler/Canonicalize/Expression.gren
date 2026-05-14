@@ -1,6 +1,7 @@
 module Compiler.Canonicalize.Expression exposing
     ( Context
     , Error (..)
+    , ScopeEntry (..)
     , OneOrMoreQualifiedEntries
     , QualifiedEntry
     , canonicalize
@@ -26,6 +27,14 @@ type Error
     | UnknownVar String
     | AmbiguousVar { name : String, modules : Array { package : PackageName, module_ : ModuleName } }
     | NotExposed { mod : String, name : String }
+    | DuplicateBinding { name : String, existingPosition : SourcePosition.Region }
+
+
+{-| Entry in the scope dictionary, representing how an unqualified name resolves.
+-}
+type ScopeEntry
+    = Local { position : SourcePosition.Region }
+    | Imported { entry : QualifiedEntry, position : SourcePosition.Region }
 
 
 {-| Context for canonicalization:
@@ -35,7 +44,7 @@ type alias Context =
     , currentModule : ModuleName
     -- Dict <qualifier> (Dict <name> entry)
     , qualifiedVars : Dict String (Dict String OneOrMoreQualifiedEntries)
-    , scope : Set String
+    , scope : Dict String ScopeEntry
     }
 
 
@@ -122,64 +131,131 @@ canonicalize_ context expr =
                         Err (ModuleNotFound qualifier)
 
         ParseAst.Var { name } ->
-            -- TODO: handle unqualified names from exposings
-            if Set.member name context.scope then
-                Ok (CanonicalAst.VarLocal name)
-            else
-                Err (UnknownVar name)
+            -- Handle unqualified names from scope (locals, imports, top-level)
+            when Dict.get name context.scope is
+                Just (Local localEntry) ->
+                    Ok (CanonicalAst.VarLocal name)
+
+                Just (Imported importedEntry) ->
+                    let
+                        entry =
+                            importedEntry.entry
+                        moduleStr =
+                            ModuleName.toString entry.module_
+                    in
+                    if String.startsWith "Gren.Kernel." moduleStr then
+                        Ok (CanonicalAst.VarKernel { kernelModule = moduleStr, name = name })
+
+                    else if entry.package == PackageName.core && moduleStr == "Debug" then
+                        Ok (CanonicalAst.VarDebug { home = entry.module_, name = name, annotation = entry.annotation })
+
+                    else if entry.package == context.pkg then
+                        Ok (CanonicalAst.VarTopLevel { home = entry.module_, name = name })
+
+                    else
+                        Ok (CanonicalAst.VarForeign { home = entry.module_, name = name, annotation = entry.annotation })
+
+                Nothing ->
+                    Err (UnknownVar name)
 
         ParseAst.Let { defs, body } ->
             -- TODO: simplify
+            -- TODO: Add parameter scoping for function definitions
+            -- TODO: Add top-level function name in scope for recursive calls
+            -- TODO: Add destructuring pattern support for let-bindings
             let
-                defNames =
-                    Array.map getLetDefName defs
-
-                extendedScope =
-                    Array.foldl (\name scope -> Set.set name scope) context.scope defNames
-
-                extendedContext =
-                    { context | scope = extendedScope }
-
-                -- Canonicalize all definitions with the extended scope
-                canonicalDefsResult =
+                -- Build extended scope with duplicate checking
+                extendedScopeResult =
                     Array.foldl
-                        (\def acc ->
+                        (\def accResult ->
+                            let
+                                nameDef =
+                                    getLetDefName def
+
+                                name =
+                                    nameDef.value
+                            in
                             Result.andThen
-                                (\currentDefs ->
-                                    Result.map
-                                        (\d -> Array.pushLast d currentDefs)
-                                        (canonicalizeLetDef extendedContext def)
+                                (\scope ->
+                                    when Dict.get name scope is
+                                        Just existingEntry ->
+                                            let
+                                                existingPosition =
+                                                    when existingEntry is
+                                                        Local local ->
+                                                            local.position
+
+                                                        Imported imported ->
+                                                            imported.position
+                                            in
+                                            Err
+                                                (DuplicateBinding
+                                                    { name = name
+                                                    , existingPosition = existingPosition
+                                                    }
+                                                )
+
+                                        Nothing ->
+                                            let
+                                                entry =
+                                                    Local
+                                                        { position = { start = nameDef.start, end = nameDef.end } }
+                                            in
+                                            Ok (Dict.set name entry scope)
                                 )
-                                acc
+                                accResult
                         )
-                        (Ok [])
+                        (Ok context.scope)
                         defs
             in
             Result.andThen
-                (\canonicalDefs ->
-                    -- Canonicalize body with extended scope
+                (\extendedScope ->
+                    let
+                        extendedContext =
+                            { context | scope = extendedScope }
+
+                        -- Canonicalize all definitions with the extended scope
+                        canonicalDefsResult =
+                            Array.foldl
+                                (\def acc ->
+                                    Result.andThen
+                                        (\currentDefs ->
+                                            Result.map
+                                                (\d -> Array.pushLast d currentDefs)
+                                                (canonicalizeLetDef extendedContext def)
+                                        )
+                                        acc
+                                )
+                                (Ok [])
+                                defs
+                    in
                     Result.andThen
-                        (\canonicalBody ->
-                            if Array.length canonicalDefs == 1 then
-                                when Array.get 0 canonicalDefs is
-                                    Just singleDef ->
-                                        Ok (CanonicalAst.Let
-                                            { def = singleDef
+                        (\canonicalDefs ->
+                            -- Canonicalize body with extended scope
+                            Result.andThen
+                                (\canonicalBody ->
+                                    if Array.length canonicalDefs == 1 then
+                                        when Array.get 0 canonicalDefs is
+                                            Just singleDef ->
+                                                Ok (CanonicalAst.Let
+                                                    { def = singleDef
+                                                    , body = canonicalBody
+                                                    }
+                                                )
+                                            Nothing ->
+                                                Err PlaceholderError
+                                    else
+                                        Ok (CanonicalAst.LetRec
+                                            { defs = canonicalDefs
                                             , body = canonicalBody
                                             }
                                         )
-                                    Nothing ->
-                                        Err PlaceholderError
-                            else
-                                Ok (CanonicalAst.LetRec
-                                    { defs = canonicalDefs
-                                    , body = canonicalBody
-                                    }
                                 )
+                                (canonicalize extendedContext body)
                         )
-                        (canonicalize extendedContext body)
+                        canonicalDefsResult
                 )
-                canonicalDefsResult
+                extendedScopeResult
 
         _ ->
             Err PlaceholderError
@@ -198,15 +274,15 @@ canonicalizePattern pat =
             Err PlaceholderError
 
 
-getLetDefName : SourcePosition.Located ParseAst.Def -> String
+getLetDefName : SourcePosition.Located ParseAst.Def -> SourcePosition.Located String
 getLetDefName def =
     when def.value is
         ParseAst.Define record ->
-            record.name.value
+            record.name
 
         ParseAst.Destruct { pattern, body } ->
             when pattern.value is
-                ParseAst.PVar name -> name
+                ParseAst.PVar name -> SourcePosition.at pattern.start pattern.end name
                 _ -> Debug.todo "Non-PVar destruct patterns not yet supported in Let"
 
 
