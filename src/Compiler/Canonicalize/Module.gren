@@ -30,11 +30,6 @@ type Error
     | ModuleNotFound String
 
 
-isInStack : String -> Array String -> Bool
-isInStack name stack =
-    Array.any ((==) name) stack
-
-
 {-| Extract all module dependencies from requires and imports.
 -}
 getModuleDependencies : ParseAst.Module -> Array String
@@ -42,15 +37,11 @@ getModuleDependencies mod =
     when mod is
         ParseAst.Implementation impl ->
             let
-                reqNames : Array String
                 reqNames =
-                    impl.requires
-                        |> Array.map (\reqLoc -> reqLoc.value.module_.value)
+                    Array.map (\reqLoc -> reqLoc.value.module_.value) impl.requires
 
-                impNames : Array String
                 impNames =
-                    impl.imports
-                        |> Array.map (\impLoc -> impLoc.value.module_.value)
+                    Array.map (\impLoc -> impLoc.value.module_.value) impl.imports
             in
             Array.append reqNames impNames
 
@@ -124,12 +115,11 @@ canonicalizeDependencies :
     PackageName ->
     Dict String SourceModule ->
     Dict String CanonicalAst.Module ->
-    Array String ->
+    Set String ->
     ParseAst.Module ->
     Result Error (Dict String CanonicalAst.Module)
 canonicalizeDependencies pkg parsedModules modules recursionStack ast =
     let
-        depNames : Array String
         depNames =
             getModuleDependencies ast
     in
@@ -140,13 +130,13 @@ canonicalizeDependencies pkg parsedModules modules recursionStack ast =
                     if Dict.member depName currentModules then
                         Ok currentModules
 
-                    else if isInStack depName recursionStack then
+                    else if Set.member depName recursionStack then
                         Err (CyclicDependency depName)
 
                     else
                         when Dict.get depName parsedModules is
                             Just parsedDep ->
-                                canonicalizeModule pkg parsedModules currentModules (Array.append recursionStack [depName]) parsedDep
+                                canonicalizeModule pkg parsedModules currentModules (Set.set depName recursionStack) parsedDep
 
                             Nothing ->
                                 Err (ModuleNotFound depName)
@@ -163,16 +153,15 @@ canonicalizeModule :
     PackageName ->
     Dict String SourceModule ->
     Dict String CanonicalAst.Module ->
-    Array String ->
+    Set String ->
     SourceModule ->
     Result Error (Dict String CanonicalAst.Module)
 canonicalizeModule pkg parsedModules modules recursionStack sourceModule =
     let
-        modName : String
         modName =
             (ParseAst.moduleName sourceModule.ast).value
     in
-    if isInStack modName recursionStack then
+    if Set.member modName recursionStack then
         Err (CyclicDependency modName)
 
     else if Dict.member modName modules then
@@ -180,14 +169,12 @@ canonicalizeModule pkg parsedModules modules recursionStack sourceModule =
 
     else
         let
-            newStack : Array String
             newStack =
-                Array.append recursionStack [modName]
+                Set.set modName recursionStack
         in
         Result.andThen
             (\modulesWithDeps ->
                 let
-                    currentMod : ModuleName
                     currentMod =
                         when ModuleName.fromString modName is
                             Just mn -> mn
@@ -196,7 +183,7 @@ canonicalizeModule pkg parsedModules modules recursionStack sourceModule =
                 canonicalizeModuleContent pkg sourceModule
                     { pkg = pkg
                     , currentModule = currentMod
-                    , modules = modulesWithDeps
+                    , qualifiedVars = Dict.empty
                     , scope = Set.empty
                     }
                     |> Result.map (\canonModule -> Dict.set modName canonModule modulesWithDeps)
@@ -218,11 +205,9 @@ canonicalizeModuleContent pkg parsedModule context =
             when ModuleName.fromString impl.name.value is
                 Just moduleName ->
                     let
-                        exportsResult : Result Error CanonicalAst.Exports
                         exportsResult =
                             canonicalizeExports impl.exports { start = impl.name.start, end = impl.name.end }
 
-                        effectsResult : Result Error CanonicalAst.Effects
                         effectsResult =
                             canonicalizeEffects impl.effects
                     in
@@ -278,7 +263,7 @@ canonicalize pkg parsedModules initialModules =
                         Ok modulesSoFar
 
                     else
-                        canonicalizeModule pkg parsedModules modulesSoFar [] parsedModule
+                        canonicalizeModule pkg parsedModules modulesSoFar Set.empty parsedModule
                 )
                 resultAcc
         )

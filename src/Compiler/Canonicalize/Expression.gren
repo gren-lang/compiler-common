@@ -1,6 +1,8 @@
 module Compiler.Canonicalize.Expression exposing
     ( Context
     , Error (..)
+    , OneOrMoreQualifiedEntries
+    , QualifiedEntry
     , canonicalize
     , canonicalizePattern
     , canonicalizeLetDef
@@ -8,7 +10,7 @@ module Compiler.Canonicalize.Expression exposing
 
 
 import Compiler.Ast.Source as ParseAst
-import Compiler.Ast.Canonical as CanonicalAst
+import Compiler.Ast.Canonical as CanonicalAst exposing (Annotation)
 import Compiler.Parse.Number as Number
 import Compiler.SourcePosition as SourcePosition
 import Compiler.ModuleName as ModuleName exposing (ModuleName)
@@ -22,26 +24,37 @@ type Error
     | InvalidModuleName String
     | ModuleNotFound String
     | UnknownVar String
+    | AmbiguousVar { name : String, modules : Array { package : PackageName, module_ : ModuleName } }
+    | NotExposed { mod : String, name : String }
 
 
+{-| Context for canonicalization:
+-}
 type alias Context =
     { pkg : PackageName
     , currentModule : ModuleName
-    , modules : Dict String CanonicalAst.Module
+    -- Dict <qualifier> (Dict <name> entry)
+    , qualifiedVars : Dict String (Dict String OneOrMoreQualifiedEntries)
     , scope : Set String
     }
 
 
+type alias OneOrMoreQualifiedEntries =
+    { first : QualifiedEntry
+    , rest : Array QualifiedEntry
+    }
+
+
+{-| Information about a qualified variable entry.
+-}
+type alias QualifiedEntry =
+     { module_ : ModuleName
+     , package : PackageName
+     , annotation : Annotation
+     }
+
+
 {-| Canonicalize a single expression.
-Handles:
-- NumberLiteral (Integer, FloatingPoint, Hex)
-- CharLiteral
-- StringLiteral
-- Accessor
-- Parens (unwrapped)
-- VarQual (qualified variables)
-- Var (local variables in Let scope)
-- Let/LetRec expressions
 -}
 canonicalize : Context -> ParseAst.Expression -> Result Error CanonicalAst.Expression
 canonicalize context expr =
@@ -75,50 +88,59 @@ canonicalize_ context expr =
         ParseAst.Parens innerExpr ->
             canonicalize_ context innerExpr.value
 
-        -- Variable resolution
         ParseAst.VarQual { qualifier, name } ->
             if String.startsWith "Gren.Kernel." qualifier then
+                -- TODO: verify existance of module?
                 Ok (CanonicalAst.VarKernel { kernelModule = qualifier, name = name })
 
-            else if ModuleName.toString context.currentModule == qualifier then
-                Ok (CanonicalAst.VarTopLevel { home = context.currentModule, name = name })
-
             else
-                when Dict.get qualifier context.modules is
-                    Just _ ->
-                        when ModuleName.fromString qualifier is
-                            Just moduleName ->
-                                Ok (CanonicalAst.VarTopLevel { home = moduleName, name = name })
+                when Dict.get qualifier context.qualifiedVars is
+                    Just innerDict ->
+                        when Dict.get name innerDict is
+                            Just { first = entry, rest = [] } ->
+                                    if entry.package == PackageName.core && ModuleName.toString entry.module_ == "Debug" then
+                                        Ok (CanonicalAst.VarDebug { home = entry.module_, name = name, annotation = entry.annotation })
+
+                                    else if entry.package == context.pkg then
+                                        Ok (CanonicalAst.VarTopLevel { home = entry.module_, name = name })
+
+                                    else
+                                        Ok (CanonicalAst.VarForeign { home = entry.module_, name = name, annotation = entry.annotation })
+
+                            Just { first, rest } ->
+                                let
+                                    mods =
+                                        Array.pushFirst first rest
+                                            |> Array.map (\e -> { package = e.package, module_ = e.module_ })
+                                in
+                                Err (AmbiguousVar { name = name, modules = mods })
 
                             Nothing ->
-                                Err (InvalidModuleName qualifier)
+                                Err (NotExposed { mod = qualifier, name = name })
 
                     Nothing ->
                         Err (ModuleNotFound qualifier)
 
         ParseAst.Var { name } ->
+            -- TODO: handle unqualified names from exposings
             if Set.member name context.scope then
                 Ok (CanonicalAst.VarLocal name)
             else
                 Err (UnknownVar name)
 
         ParseAst.Let { defs, body } ->
-            -- Collect all definition names to extend the scope
+            -- TODO: simplify
             let
-                defNames : Array String
                 defNames =
                     Array.map getLetDefName defs
 
-                extendedScope : Set String
                 extendedScope =
                     Array.foldl (\name scope -> Set.set name scope) context.scope defNames
 
-                extendedContext : Context
                 extendedContext =
                     { context | scope = extendedScope }
 
                 -- Canonicalize all definitions with the extended scope
-                canonicalDefsResult : Result Error (Array CanonicalAst.Def)
                 canonicalDefsResult =
                     Array.foldl
                         (\def acc ->
@@ -165,6 +187,7 @@ canonicalize_ context expr =
 
 -- Helpers
 
+
 canonicalizePattern : ParseAst.Pattern -> Result Error CanonicalAst.Pattern
 canonicalizePattern pat =
     when pat.value is
@@ -189,10 +212,10 @@ getLetDefName def =
 
 canonicalizeLetDef : Context -> SourcePosition.Located ParseAst.Def -> Result Error CanonicalAst.Def
 canonicalizeLetDef context def =
+    -- TODO: simplify
     when def.value is
         ParseAst.Define record ->
             let
-                paramsResult : Result Error (Array CanonicalAst.Pattern)
                 paramsResult =
                     Array.foldl
                         (\pat acc ->
