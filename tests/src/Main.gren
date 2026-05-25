@@ -22,6 +22,7 @@ import Test.Compiler.Parse.Declaration
 import Test.Compiler.Parse.Module
 import Test.Compiler.Canonicalize.Module
 import Test.Compiler.Canonicalize.Expression
+import Test.Compiler.Canonicalize.Pattern
 
 
 main : TestRunner.Program
@@ -48,4 +49,5 @@ main =
             , Test.Compiler.Parse.Module.tests
             , Test.Compiler.Canonicalize.Module.tests
             , Test.Compiler.Canonicalize.Expression.tests
+            , Test.Compiler.Canonicalize.Pattern.tests
             ]

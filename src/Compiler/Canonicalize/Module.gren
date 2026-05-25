@@ -82,7 +82,7 @@ canonicalizeDef context value =
                             (\current ->
                                 Result.map
                                     (\p -> Array.append current [p])
-                                    (Expression.canonicalizePattern pat)
+                                    (Expression.canonicalizePattern context pat)
                             )
                             acc
                     )

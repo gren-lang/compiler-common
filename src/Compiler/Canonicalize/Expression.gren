@@ -7,6 +7,9 @@ module Compiler.Canonicalize.Expression exposing
     , canonicalize
     , canonicalizePattern
     , canonicalizeLetDef
+    , canonicalizeRecordField
+    , extractBoundNames
+    , extendScopeWithNames
     )
 
 
@@ -290,159 +293,296 @@ canonicalize_ context expr =
             Err PlaceholderError
 
 
--- Helpers
+-- Pattern Canonicalization
 
 
-getParamName : SourcePosition.Located ParseAst.Pattern_ -> Result Error (SourcePosition.Located String)
-getParamName locatedPattern =
-    when locatedPattern.value is
+canonicalizePattern : Context -> ParseAst.Pattern -> Result Error CanonicalAst.Pattern
+canonicalizePattern context pat =
+    when pat.value is
         ParseAst.PVar name ->
-            Ok (SourcePosition.at locatedPattern.start locatedPattern.end name)
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PVar name))
 
-        _ ->
-            Err PlaceholderError
+        ParseAst.PAnything _ ->
+            Ok (SourcePosition.at pat.start pat.end CanonicalAst.PAnything)
 
+        ParseAst.PChr c ->
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PChr c))
 
-extendScopeWithPatterns : Context -> Array ParseAst.Pattern -> Result Error Context
-extendScopeWithPatterns context patterns =
-    -- Step 1: Extract names from patterns and check for param-vs-param duplicates
-    let
-        namesResult =
-            Array.foldl
-                (\locatedPattern accResult ->
-                    Result.andThen
-                        (\acc ->
-                            when getParamName locatedPattern is
-                                Ok name ->
-                                    -- Check if name already exists in acc
-                                    let
-                                        hasDuplicate =
-                                            Array.any (\n -> n.value == name.value) acc
-                                    in
-                                    if hasDuplicate then
-                                        -- Find the first occurrence to get its position
-                                        let
-                                            existingName =
-                                                Array.foldl
-                                                    (\n found ->
-                                                        if found == Nothing then
-                                                            if n.value == name.value then
-                                                                Just n
-                                                            else
-                                                                Nothing
-                                                        else
-                                                            found
-                                                    )
-                                                    Nothing
-                                                    acc
-                                        in
-                                        when existingName is
-                                            Just foundName ->
-                                                Err
-                                                    (DuplicateBinding
-                                                        { name = name.value
-                                                        , existingPosition =
-                                                            { start = foundName.start
-                                                            , end = foundName.end
-                                                            }
-                                                        }
-                                                    )
+        ParseAst.PStr s ->
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PStr s))
 
-                                            Nothing ->
-                                                -- Shouldn't happen since hasDuplicate is true
-                                                Err PlaceholderError
-                                    else
-                                        Ok (Array.pushLast name acc)
+        ParseAst.PInt { value } ->
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PInt value))
 
-                                Err e ->
-                                    Err e
-                        )
-                        accResult
-                )
-                (Ok [])
-                patterns
-    in
-    Result.andThen
-        (\names ->
-            -- Step 2: Check each name against existing scope
-            let
-                scopeCheckResult =
-                    Array.foldl
-                        (\name accResult ->
-                            Result.andThen
-                                (\_ ->
-                                    when Dict.get name.value context.scope is
-                                        Just existingEntry ->
-                                            let
-                                                existingPosition =
-                                                    when existingEntry is
-                                                        Local localEntry ->
-                                                            localEntry.position
-
-                                                        Imported importedEntry ->
-                                                            importedEntry.position
-                                            in
-                                            Err
-                                                (DuplicateBinding
-                                                    { name = name.value
-                                                    , existingPosition = existingPosition
-                                                    }
-                                                )
-
-                                        Nothing ->
-                                            Ok {}
-                                )
-                                accResult
-                        )
-                        (Ok {})
-                        names
-            in
-            Result.map
-                (\_ ->
-                    -- Step 3: Build extended scope
-                    let
-                        newScope =
-                            Array.foldl
-                                (\name scope ->
-                                    Dict.set name.value (Local { position = { start = name.start, end = name.end } }) scope
-                                )
-                                context.scope
-                                names
-                    in
-                    { context | scope = newScope }
-                )
-                scopeCheckResult
-        )
-        namesResult
-
-
-canonicalizeLambda : Context -> Array ParseAst.Pattern -> ParseAst.Expression -> Result Error CanonicalAst.Expression_
-canonicalizeLambda context patterns body =
-    -- Step 1: Validate patterns and extend scope
-    let
-        extendedContextResult =
-            extendScopeWithPatterns context patterns
-    in
-    Result.andThen
-        (\extendedContext ->
-            -- Step 2: Canonicalize patterns
+        ParseAst.PArray patterns ->
             let
                 canonPatternsResult =
                     Array.foldl
-                        (\pat acc ->
+                        (\subPat acc ->
                             Result.andThen
                                 (\current ->
                                     Result.map
-                                        (\p -> Array.pushLast p current)
-                                        (canonicalizePattern pat)
+                                        (\cp -> Array.pushLast cp current)
+                                        (canonicalizePattern context subPat)
                                 )
                                 acc
                         )
                         (Ok [])
                         patterns
             in
-            Result.andThen
+            Result.map
                 (\canonPatterns ->
+                    SourcePosition.at pat.start pat.end (CanonicalAst.PArray canonPatterns)
+                )
+                canonPatternsResult
+
+        ParseAst.PRecord fields ->
+            -- Normalize fields: replace Nothing patterns with PVar fieldName
+            let
+                normalizedFields =
+                    Array.map
+                        (\field ->
+                            when field.pattern is
+                                Nothing ->
+                                    { field | pattern = Just (SourcePosition.at field.field.start field.field.end (ParseAst.PVar field.field.value)) }
+
+                                Just _ ->
+                                    field
+                        )
+                        fields
+
+                canonFieldsResult =
+                    Array.foldl
+                        (\field acc ->
+                            Result.andThen
+                                (\current ->
+                                    Result.map
+                                        (\cf -> Array.pushLast cf current)
+                                        (canonicalizeRecordField context field)
+                                )
+                                acc
+                        )
+                        (Ok [])
+                        normalizedFields
+            in
+            Result.map
+                (\canonFields ->
+                    SourcePosition.at pat.start pat.end (CanonicalAst.PRecord canonFields)
+                )
+                canonFieldsResult
+
+        ParseAst.PAlias { pattern, name } ->
+            Result.map
+                (\canonPattern ->
+                    SourcePosition.at pat.start pat.end (
+                        CanonicalAst.PAlias
+                            { pattern = canonPattern
+                            , alias = name
+                            }
+                    )
+                )
+                (canonicalizePattern context pattern)
+
+        ParseAst.PCtor _ ->
+            Err PlaceholderError  -- TODO: implement constructor pattern resolution
+
+        ParseAst.PCtorQual _ ->
+            Err PlaceholderError  -- TODO: implement qualified constructor pattern resolution
+
+
+canonicalizeRecordField : Context -> ParseAst.PRecordField -> Result Error CanonicalAst.PatternRecordField
+canonicalizeRecordField context field =
+    when field.pattern is
+        Just p ->
+            Result.map
+                (\canonPattern ->
+                    -- Field position spans from field name to end of pattern
+                    let
+                        fieldEnd =
+                            if p.end.col > field.field.end.col || p.end.row > field.field.end.row then
+                                p.end
+                            else
+                                field.field.end
+                    in
+                    SourcePosition.at field.field.start fieldEnd { name = field.field.value, pattern = canonPattern }
+                )
+                (canonicalizePattern context p)
+
+        Nothing ->
+            -- Shouldn't happen due to normalization in PRecord case
+            Err PlaceholderError
+
+
+-- Helpers
+
+
+-- Scope extension functions for pattern canonicalization
+
+
+{-| Extract all bound names from canonical patterns.
+Checks for duplicate bindings within the pattern list.
+-}
+extractBoundNames : Array CanonicalAst.Pattern -> Result Error (Array (SourcePosition.Located String))
+extractBoundNames patterns =
+    let
+        extractFromPattern : CanonicalAst.Pattern -> Array (SourcePosition.Located String)
+        extractFromPattern locatedPat =
+            when locatedPat.value is
+                CanonicalAst.PVar name ->
+                    [SourcePosition.at locatedPat.start locatedPat.end name]
+
+                CanonicalAst.PAnything ->
+                    []
+
+                CanonicalAst.PChr _ ->
+                    []
+
+                CanonicalAst.PStr _ ->
+                    []
+
+                CanonicalAst.PInt _ ->
+                    []
+
+                CanonicalAst.PRecord fields ->
+                    Array.foldl
+                        (\field acc ->
+                            acc ++ (extractFromRecordField field)
+                        )
+                        []
+                        fields
+
+                CanonicalAst.PArray subPatterns ->
+                    Array.foldl
+                        (\subPat acc ->
+                            acc ++ (extractFromPattern subPat)
+                        )
+                        []
+                        subPatterns
+
+                CanonicalAst.PAlias pa ->
+                    Array.pushFirst pa.alias (extractFromPattern pa.pattern)
+
+                CanonicalAst.PBool _ ->
+                    []
+
+                CanonicalAst.PCtor _ ->
+                    []  -- TODO: implement when we add constructor support
+
+        extractFromRecordField : CanonicalAst.PatternRecordField -> Array (SourcePosition.Located String)
+        extractFromRecordField locatedField =
+            extractFromPattern locatedField.value.pattern
+    in
+    Array.foldl
+        (\locatedPat accResult ->
+            Result.andThen
+                (\acc ->
+                    let
+                        names =
+                            extractFromPattern locatedPat
+
+                        checkForDuplicates : Array (SourcePosition.Located String) -> Array (SourcePosition.Located String) -> Result Error (Array (SourcePosition.Located String))
+                        checkForDuplicates newNames existingNames =
+                            if Array.isEmpty newNames then
+                                Ok existingNames
+
+                            else
+                                let
+                                    name =
+                                        when Array.get 0 newNames is
+                                            Just n -> n
+                                            Nothing -> SourcePosition.at SourcePosition.emptyPos SourcePosition.emptyPos ""
+                                    rest =
+                                        if Array.length newNames > 1 then
+                                            Array.slice 1 (Array.length newNames) newNames
+                                        else
+                                            []
+                                    -- Find first existing name with same value
+                                    foundExisting =
+                                        Array.foldl
+                                            (\n existing ->
+                                                if existing == Nothing && n.value == name.value then
+                                                    Just n
+                                                else
+                                                    existing
+                                            )
+                                            Nothing
+                                            existingNames
+                                in
+                                when foundExisting is
+                                    Just existingName ->
+                                        Err (DuplicateBinding { name = name.value, existingPosition = { start = existingName.start, end = existingName.end } })
+                                    Nothing ->
+                                        if Array.any (\n -> n.value == name.value) existingNames then
+                                            Err PlaceholderError
+                                        else
+                                            checkForDuplicates rest (Array.pushLast name existingNames)
+                    in
+                    checkForDuplicates names acc
+                )
+                accResult
+        )
+        (Ok [])
+        patterns
+
+
+{-| Extend the context's scope with the given bound names.
+Checks for conflicts with existing bindings.
+-}
+extendScopeWithNames : Context -> Array (SourcePosition.Located String) -> Result Error Context
+extendScopeWithNames context names =
+    Array.foldl
+        (\locatedName accResult ->
+            Result.andThen
+                (\currentContext ->
+                    when Dict.get locatedName.value currentContext.scope is
+                        Just existingEntry ->
+                            let
+                                existingPosition =
+                                    when existingEntry is
+                                        Local localEntry ->
+                                            localEntry.position
+
+                                        Imported importedEntry ->
+                                            importedEntry.position
+                            in
+                            Err (DuplicateBinding { name = locatedName.value, existingPosition = existingPosition })
+
+                        Nothing ->
+                            let
+                                newScope =
+                                    Dict.set locatedName.value (Local { position = { start = locatedName.start, end = locatedName.end } }) currentContext.scope
+                            in
+                            Ok { currentContext | scope = newScope }
+                )
+                accResult
+        )
+        (Ok context)
+        names
+
+
+canonicalizeLambda : Context -> Array ParseAst.Pattern -> ParseAst.Expression -> Result Error CanonicalAst.Expression_
+canonicalizeLambda context patterns body =
+    -- Step 1: Canonicalize patterns
+    let
+        canonPatternsResult =
+            Array.foldl
+                (\pat acc ->
+                    Result.andThen
+                        (\current ->
+                            Result.map
+                                (\p -> Array.pushLast p current)
+                                (canonicalizePattern context pat)
+                        )
+                        acc
+                )
+                (Ok [])
+                patterns
+    in
+    Result.andThen
+        (\canonPatterns ->
+            -- Step 2: Extract bound names from canonical patterns and extend scope
+            Result.andThen
+                (\extendedContext ->
                     -- Step 3: Canonicalize body with extended scope
                     Result.map
                         (\canonBody ->
@@ -453,19 +593,14 @@ canonicalizeLambda context patterns body =
                         )
                         (canonicalize extendedContext body)
                 )
-                canonPatternsResult
+                (Result.andThen
+                    (\names ->
+                        extendScopeWithNames context names
+                    )
+                    (extractBoundNames canonPatterns)
+                )
         )
-        extendedContextResult
-
-
-canonicalizePattern : ParseAst.Pattern -> Result Error CanonicalAst.Pattern
-canonicalizePattern pat =
-    when pat.value is
-        ParseAst.PVar name ->
-            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PVar name))
-
-        _ ->
-            Err PlaceholderError
+        canonPatternsResult
 
 
 getLetDefName : SourcePosition.Located ParseAst.Def -> SourcePosition.Located String
@@ -485,47 +620,83 @@ canonicalizeLetDef context def =
     -- TODO: simplify
     when def.value is
         ParseAst.Define record ->
+            -- Step 1: Canonicalize parameter patterns
             let
-                paramsResult =
+                canonParamsResult =
                     Array.foldl
                         (\pat acc ->
                             Result.andThen
                                 (\currentParams ->
                                     Result.map
                                         (\p -> Array.append currentParams [p])
-                                        (canonicalizePattern pat)
+                                        (canonicalizePattern context pat)
                                 )
                                 acc
                         )
                         (Ok [])
                         record.args
             in
-            Result.map2
-                (\params body ->
-                    CanonicalAst.Def
-                        { name = record.name
-                        , params = params
-                        , body = body
-                        }
+            Result.andThen
+                (\canonParams ->
+                    -- Step 2: Extract bound names from parameters and extend scope
+                    Result.andThen
+                        (\extendedContext ->
+                            -- Step 3: Canonicalize body with extended scope
+                            Result.map
+                                (\canonBody ->
+                                    CanonicalAst.Def
+                                        { name = record.name
+                                        , params = canonParams
+                                        , body = canonBody
+                                        }
+                                )
+                                (canonicalize extendedContext record.body)
+                        )
+                        (Result.andThen
+                            (\names ->
+                                extendScopeWithNames context names
+                            )
+                            (extractBoundNames canonParams)
+                        )
                 )
-                paramsResult
-                (canonicalize context record.body)
+                canonParamsResult
 
         ParseAst.Destruct { pattern, body } ->
-            Result.map2
-                (\canonPattern canonBody ->
-                    when pattern.value is
-                        ParseAst.PVar name ->
-                            Ok (CanonicalAst.Def
-                                { name = SourcePosition.at pattern.start pattern.end name
-                                , params = []
-                                , body = canonBody
-                                }
-                            )
-                        _ ->
-                            -- For non-PVar patterns, we'll need more complete pattern support
-                            Err PlaceholderError
+            -- Step 1: Canonicalize the pattern
+            Result.andThen
+                (\canonPattern ->
+                    -- Step 2: Extract bound names from pattern and extend scope
+                    Result.andThen
+                        (\names ->
+                            Result.andThen
+                                (\extendedContext ->
+                                    -- Step 3: Canonicalize body with extended scope
+                                    -- For Destruct, we create a Def with the pattern's bound name as the def name
+                                    -- This is a simplification - proper destructuring would need more work
+                                    Result.map
+                                        (\canonBody ->
+                                            if Array.length names == 1 then
+                                                let
+                                                    nameLoc =
+                                                        when Array.get 0 names is
+                                                            Just n -> n
+                                                            Nothing -> SourcePosition.at pattern.start pattern.end ""
+                                                in
+                                                Ok (CanonicalAst.Def
+                                                    { name = nameLoc
+                                                    , params = []
+                                                    , body = canonBody
+                                                    }
+                                                )
+                                            else
+                                                -- Multiple bindings from destructuring - not yet supported
+                                                Err PlaceholderError
+                                        )
+                                        (canonicalize extendedContext body)
+                                )
+                                (extendScopeWithNames context names)
+                        )
+                        (extractBoundNames [canonPattern])
                 )
-                (canonicalizePattern pattern)
-                (canonicalize context body)
+                (canonicalizePattern context pattern)
                 |> Result.andThen Basics.identity

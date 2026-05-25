@@ -171,7 +171,7 @@ type Pattern_
   | PRecord (Array PatternRecordField)
   | PAlias
     { pattern : Pattern
-    , alias : String
+    , alias : SourcePosition.Located String
     }
   | PArray (Array Pattern)
   | PBool

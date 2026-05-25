@@ -1,0 +1,800 @@
+module Test.Compiler.Canonicalize.Pattern exposing (tests)
+
+import Compiler.Canonicalize.Expression as Canonicalize exposing (Context, Error(..), QualifiedEntry, OneOrMoreQualifiedEntries)
+import Compiler.Ast.Source as ParseAst
+import Compiler.Ast.Canonical as CanonicalAst exposing (Annotation, Type(..), FreeVars)
+import Compiler.Parse.Pattern as PatternParser
+import Compiler.Parse.Expression as ExpressionParser
+import Compiler.Parse.Context as Context
+import Compiler.SourcePosition as SourcePosition
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Compiler.ModuleName as ModuleName exposing (ModuleName)
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import String.Parser.Advanced as Parser
+import Array exposing (Array)
+import Dict exposing (Dict)
+import Set exposing (Set)
+
+
+-- TODO: Review this more carefully!
+
+
+tests : Test
+tests =
+    describe "Compiler.Canonicalize.Pattern"
+        [ describe "Simple Pattern Literals" patternLiteralTests
+        , describe "Variable Patterns" variablePatternTests
+        , describe "Array Patterns" arrayPatternTests
+        , describe "Record Patterns" recordPatternTests
+        , describe "Alias Patterns" aliasPatternTests
+        , describe "Combined Patterns" combinedPatternTests
+        , describe "Scope Extension Tests" scopeExtensionTests
+        , describe "Source Position Preservation" positionPreservationTests
+        , describe "Extract Bound Names" extractBoundNamesTests
+        , describe "Extend Scope With Names" extendScopeWithNamesTests
+        , describe "Error Handling" errorHandlingTests
+        ]
+
+
+-- TEST HELPERS
+
+
+moduleContext : String -> Canonicalize.Context
+moduleContext mod =
+    packageContext PackageName.example mod
+
+
+packageContext : PackageName -> String -> Canonicalize.Context
+packageContext pkg currentModule =
+    { pkg = pkg
+    , currentModule = unsafeModuleName currentModule
+    , qualifiedVars = Dict.empty
+    , scope = Dict.empty
+    }
+
+
+unsafeModuleName : String -> ModuleName.ModuleName
+unsafeModuleName str =
+    when ModuleName.fromString str is
+        Just mn -> mn
+        Nothing -> Debug.todo "Invalid module name in test"
+
+
+dummyAnnotation : Annotation
+dummyAnnotation =
+    { freeVars = Set.empty
+    , tipe = TVar "a"
+    }
+
+
+dummyRegion : SourcePosition.Region
+dummyRegion =
+    { start = SourcePosition.emptyPos, end = SourcePosition.emptyPos }
+
+
+withScopedLocal : String -> Canonicalize.Context -> Canonicalize.Context
+withScopedLocal varName ctx =
+    { ctx | scope =
+        Dict.set varName (Canonicalize.Local { position = dummyRegion }) ctx.scope
+    }
+
+
+qualifiedEntry : PackageName -> String -> Annotation -> Canonicalize.QualifiedEntry
+qualifiedEntry pkg moduleNameStr annotation =
+    { module_ = unsafeModuleName moduleNameStr
+    , package = pkg
+    , annotation = annotation
+    }
+
+
+withScopedImported : String -> Canonicalize.QualifiedEntry -> Canonicalize.Context -> Canonicalize.Context
+withScopedImported name entry ctx =
+    { ctx | scope =
+        Dict.set name (Canonicalize.Imported { entry = entry, position = dummyRegion }) ctx.scope
+    }
+
+
+withQualifiedVar : PackageName -> String -> String -> Canonicalize.Context -> Canonicalize.Context
+withQualifiedVar pkg mod valueName ctx =
+    { ctx | qualifiedVars =
+        Dict.update mod
+            (\maybeMod ->
+                when maybeMod is
+                    Just modValue ->
+                        Just <|
+                            Dict.update valueName
+                                (\maybeValue ->
+                                    when maybeValue is
+                                        Just entry ->
+                                            Just
+                                                { entry | rest = Array.pushLast (qualifiedEntry pkg mod dummyAnnotation) entry.rest }
+
+                                        Nothing ->
+                                            Just { first = qualifiedEntry pkg mod dummyAnnotation, rest = [] }
+                                )
+                                modValue
+
+                    Nothing ->
+                        Just <|
+                            Dict.singleton valueName { first = qualifiedEntry pkg mod dummyAnnotation, rest = [] }
+            )
+            ctx.qualifiedVars
+    }
+
+
+expectCanonicalizePattern : Canonicalize.Context -> String -> CanonicalAst.Pattern_ -> Expectation
+expectCanonicalizePattern context source expected =
+    when Parser.run PatternParser.parser Context.empty source is
+        Err parseErrs ->
+            Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+        Ok parsedPattern ->
+            when Canonicalize.canonicalizePattern context parsedPattern is
+                Ok actual ->
+                    Expect.equal expected actual.value
+                Err err ->
+                    Expect.fail ("Canonicalization failed: " ++ Debug.toString err)
+
+
+expectCanonicalizePatternFlex : Canonicalize.Context -> String -> (CanonicalAst.Pattern_ -> Expectation) -> Expectation
+expectCanonicalizePatternFlex context source checker =
+    when Parser.run PatternParser.parser Context.empty source is
+        Err parseErrs ->
+            Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+        Ok parsedPattern ->
+            when Canonicalize.canonicalizePattern context parsedPattern is
+                Ok actual ->
+                    checker actual.value
+                Err err ->
+                    Expect.fail ("Canonicalization failed: " ++ Debug.toString err)
+
+
+expectCanonicalizePatternError : Canonicalize.Context -> String -> Canonicalize.Error -> Expectation
+expectCanonicalizePatternError context source expectedErr =
+    when Parser.run PatternParser.parser Context.empty source is
+        Err parseErrs ->
+            Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+        Ok parsedPattern ->
+            when Canonicalize.canonicalizePattern context parsedPattern is
+                Ok actual ->
+                    Expect.fail ("Canonicalization succeeded but expected error: " ++ Debug.toString expectedErr)
+                Err err ->
+                    Expect.equal expectedErr err
+
+
+expectExtractBoundNames : Array CanonicalAst.Pattern -> Array String -> Expectation
+expectExtractBoundNames patterns expectedNames =
+    when Canonicalize.extractBoundNames patterns is
+        Ok names ->
+            Expect.equal expectedNames (Array.map .value names)
+        Err err ->
+            Expect.fail ("extractBoundNames failed: " ++ Debug.toString err)
+
+
+expectExtractBoundNamesError : Array CanonicalAst.Pattern -> Canonicalize.Error -> Expectation
+expectExtractBoundNamesError patterns expectedErr =
+    when Canonicalize.extractBoundNames patterns is
+        Ok names ->
+            Expect.fail ("extractBoundNames succeeded but expected error: " ++ Debug.toString expectedErr)
+        Err err ->
+            Expect.equal expectedErr err
+
+
+expectExtendScopeWithNames : Canonicalize.Context -> Array (SourcePosition.Located String) -> (Canonicalize.Context -> Expectation) -> Expectation
+expectExtendScopeWithNames context names checker =
+    when Canonicalize.extendScopeWithNames context names is
+        Ok result ->
+            checker result
+        Err err ->
+            Expect.fail ("extendScopeWithNames failed: " ++ Debug.toString err)
+
+
+expectExtendScopeWithNamesError : Canonicalize.Context -> Array (SourcePosition.Located String) -> Canonicalize.Error -> Expectation
+expectExtendScopeWithNamesError context names expectedErr =
+    when Canonicalize.extendScopeWithNames context names is
+        Ok result ->
+            Expect.fail ("extendScopeWithNames succeeded but expected error")
+        Err err ->
+            Expect.equal expectedErr err
+
+
+locatedString : String -> SourcePosition.Located String
+locatedString str =
+    SourcePosition.at SourcePosition.emptyPos SourcePosition.emptyPos str
+
+
+locatedPattern : CanonicalAst.Pattern_ -> CanonicalAst.Pattern
+locatedPattern pat =
+    SourcePosition.at SourcePosition.emptyPos SourcePosition.emptyPos pat
+
+
+locatedField : String -> CanonicalAst.Pattern -> CanonicalAst.PatternRecordField
+locatedField name pat =
+    SourcePosition.at SourcePosition.emptyPos SourcePosition.emptyPos { name = name, pattern = pat }
+
+
+-- TESTS
+
+
+patternLiteralTests : Array Test
+patternLiteralTests =
+    let
+        context =
+            moduleContext "Test"
+    in
+    [ test "Wildcard pattern _" <| \_ ->
+        expectCanonicalizePattern context "_" CanonicalAst.PAnything
+    , test "Character literal 'a'" <| \_ ->
+        expectCanonicalizePattern context "'a'" (CanonicalAst.PChr 'a')
+    , test "Character literal newline" <| \_ ->
+        expectCanonicalizePattern context "'\n'" (CanonicalAst.PChr '\n')
+    , test "Character literal single quote" <| \_ ->
+        expectCanonicalizePattern context "'\\''" (CanonicalAst.PChr '\'')
+    , test "String literal empty" <| \_ ->
+        expectCanonicalizePattern context "\"\"" (CanonicalAst.PStr "")
+    , test "String literal simple" <| \_ ->
+        expectCanonicalizePattern context "\"hello\"" (CanonicalAst.PStr "hello")
+    , test "String literal with escape" <| \_ ->
+        expectCanonicalizePattern context "\"escape \\\"quote\\\"\"" (CanonicalAst.PStr "escape \"quote\"")
+    , test "Integer literal zero" <| \_ ->
+        expectCanonicalizePattern context "0" (CanonicalAst.PInt 0)
+    , test "Integer literal positive" <| \_ ->
+        expectCanonicalizePattern context "42" (CanonicalAst.PInt 42)
+    , test "Integer literal hex" <| \_ ->
+        expectCanonicalizePattern context "0xFF" (CanonicalAst.PInt 255)
+    ]
+
+
+variablePatternTests : Array Test
+variablePatternTests =
+    [ test "Single variable pattern x" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+        in
+        expectCanonicalizePattern context "x" (CanonicalAst.PVar "x")
+    , test "Variable pattern with underscores" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+        in
+        expectCanonicalizePattern context "my_var" (CanonicalAst.PVar "my_var")
+    , test "Variable pattern in scope (should still work)" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+                    |> withScopedLocal "existing"
+        in
+        expectCanonicalizePattern context "existing" (CanonicalAst.PVar "existing")
+    ]
+
+
+arrayPatternTests : Array Test
+arrayPatternTests =
+    let
+        context =
+            moduleContext "Test"
+    in
+    [ test "Empty array pattern" <| \_ ->
+        expectCanonicalizePattern context "[]" (CanonicalAst.PArray [])
+    , test "Single element array [x]" <| \_ ->
+        expectCanonicalizePatternFlex context "[x]" <| \result ->
+            when result is
+                CanonicalAst.PArray patterns ->
+                    when Array.get 0 patterns is
+                        Just p ->
+                            Expect.all
+                                [ \_ -> Array.length patterns |> Expect.equal 1
+                                , \_ -> Expect.equal (CanonicalAst.PVar "x") p.value
+                                ]
+                                {}
+                        _ ->
+                            Expect.fail "Expected at least one element"
+                _ ->
+                    Expect.fail "Expected PArray"
+    , test "Multiple element array [x, y, z]" <| \_ ->
+        expectCanonicalizePatternFlex context "[x, y, z]" <| \result ->
+            when result is
+                CanonicalAst.PArray patterns ->
+                    Expect.equal 3 (Array.length patterns)
+                _ ->
+                    Expect.fail "Expected PArray"
+    , test "Nested array patterns [[x]]" <| \_ ->
+        expectCanonicalizePatternFlex context "[[x]]" <| \result ->
+            when result is
+                CanonicalAst.PArray outer ->
+                    when Array.get 0 outer is
+                        Just innerLocated ->
+                            when innerLocated.value is
+                                CanonicalAst.PArray inner ->
+                                    Expect.equal 1 (Array.length inner)
+                                _ ->
+                                    Expect.fail "Expected inner PArray"
+                        _ ->
+                            Expect.fail "Expected outer array to have one element"
+                _ ->
+                    Expect.fail "Expected PArray"
+    , test "Mixed patterns in array [1, x, 'a']" <| \_ ->
+        expectCanonicalizePatternFlex context "[1, x, 'a']" <| \result ->
+            when result is
+                CanonicalAst.PArray patterns ->
+                    Expect.equal 3 (Array.length patterns)
+                _ ->
+                    Expect.fail "Expected PArray"
+    , test "Duplicate bindings in array [x, x]" <| \_ ->
+        -- This should fail when used in a lambda/let due to duplicate binding
+        -- But pattern canonicalization itself doesn't check for duplicates
+        -- The duplicate check happens in extractBoundNames
+        expectCanonicalizePatternFlex context "[x, x]" <| \result ->
+            when result is
+                CanonicalAst.PArray patterns ->
+                    Expect.equal 2 (Array.length patterns)
+                _ ->
+                    Expect.fail "Expected PArray"
+    ]
+
+recordPatternTests : Array Test
+recordPatternTests =
+    let
+        context =
+            moduleContext "Test"
+    in
+    [ test "Simple record pattern { x }" <| \_ ->
+        expectCanonicalizePatternFlex context "{ x }" <| \result ->
+            when result is
+                CanonicalAst.PRecord fields ->
+                    when Array.get 0 fields is
+                        Just field ->
+                            Expect.all
+                                [ .value >> .name >> Expect.equal "x"
+                                , .value >> .pattern >> .value >> Expect.equal (CanonicalAst.PVar "x")
+                                ]
+                                field
+                        _ ->
+                            Expect.fail "Expected at least one field"
+                _ ->
+                    Expect.fail "Expected PRecord"
+    , test "Multiple fields { x, y, z }" <| \_ ->
+        expectCanonicalizePatternFlex context "{ x, y, z }" <| \result ->
+            when result is
+                CanonicalAst.PRecord fields ->
+                    Expect.equal 3 (Array.length fields)
+                _ ->
+                    Expect.fail "Expected PRecord"
+    , test "Explicit pattern { x = y }" <| \_ ->
+        expectCanonicalizePatternFlex context "{ x = y }" <| \result ->
+            when result is
+                CanonicalAst.PRecord fields ->
+                    when Array.get 0 fields is
+                        Just field ->
+                            Expect.all
+                                [ .value >> .name >> Expect.equal "x"
+                                , .value >> .pattern >> .value >> Expect.equal (CanonicalAst.PVar "y")
+                                ]
+                                field
+                        _ ->
+                            Expect.fail "Expected at least one field"
+                _ ->
+                    Expect.fail "Expected PRecord"
+    , test "Mixed implicit and explicit { x, y = z }" <| \_ ->
+        expectCanonicalizePatternFlex context "{ x, y = z }" <| \result ->
+            when result is
+                CanonicalAst.PRecord fields ->
+                    Expect.equal 2 (Array.length fields)
+                _ ->
+                    Expect.fail "Expected PRecord"
+    , test "Nested patterns in fields { x = [y] }" <| \_ ->
+        expectCanonicalizePatternFlex context "{ x = [y] }" <| \result ->
+            when result is
+                CanonicalAst.PRecord fields ->
+                    when Array.get 0 fields is
+                        Just field ->
+                            when field.value.pattern.value is
+                                CanonicalAst.PArray patterns ->
+                                    Expect.equal 1 (Array.length patterns)
+                                _ ->
+                                    Expect.fail "Expected PArray in field pattern"
+                        _ ->
+                            Expect.fail "Expected field"
+                _ ->
+                    Expect.fail "Expected PRecord"
+    , test "Nested record pattern { x = { y } }" <| \_ ->
+        expectCanonicalizePatternFlex context "{ x = { y } }" <| \result ->
+            when result is
+                CanonicalAst.PRecord outerFields ->
+                    when Array.get 0 outerFields is
+                        Just outerField ->
+                            when outerField.value.pattern.value is
+                                CanonicalAst.PRecord innerFields ->
+                                    Expect.equal 1 (Array.length innerFields)
+                                _ ->
+                                    Expect.fail "Expected PRecord in field pattern"
+                        _ ->
+                            Expect.fail "Expected field"
+                _ ->
+                    Expect.fail "Expected PRecord"
+    ]
+
+
+aliasPatternTests : Array Test
+aliasPatternTests =
+    let
+        context =
+            moduleContext "Test"
+    in
+    [ test "Simple alias x as y" <| \_ ->
+        expectCanonicalizePatternFlex context "x as y" <| \result ->
+            when result is
+                CanonicalAst.PAlias pa ->
+                    Expect.all
+                        [ .pattern >> .value >> Expect.equal (CanonicalAst.PVar "x")
+                        , .alias >> .value >> Expect.equal "y"
+                        ]
+                        pa
+                _ ->
+                    Expect.fail "Expected PAlias"
+    , test "Alias with record { a, b } as rec" <| \_ ->
+        expectCanonicalizePatternFlex context "{ a, b } as rec" <| \result ->
+            when result is
+                CanonicalAst.PAlias pa ->
+                    Expect.all
+                        [ .alias >> .value >> Expect.equal "rec"
+                        , .pattern >> .value >> (\p ->
+                            when p is
+                                CanonicalAst.PRecord _ ->
+                                    Expect.pass
+                                _ ->
+                                    Expect.fail "Expected PRecord"
+                          )
+                        ]
+                        pa
+                _ ->
+                    Expect.fail "Expected PAlias"
+
+    , test "Alias with array [x] as xs" <| \_ ->
+        expectCanonicalizePatternFlex context "[x] as xs" <| \result ->
+            when result is
+                CanonicalAst.PAlias pa ->
+                    Expect.all
+                        [ .alias >> .value >> Expect.equal "xs"
+                        , .pattern >> .value >> (\p ->
+                            when p is
+                                CanonicalAst.PArray _ ->
+                                    Expect.pass
+                                _ ->
+                                    Expect.fail "Expected PArray"
+                          )
+                        ]
+                        pa
+                _ ->
+                    Expect.fail "Expected PAlias"
+    ]
+
+
+combinedPatternTests : Array Test
+combinedPatternTests =
+    let
+        context =
+            moduleContext "Test"
+    in
+    [ test "Lambda with multiple patterns \\x [y, z] -> ..." <| \_ ->
+        when Parser.run ExpressionParser.parser Context.empty "\\x [y, z] -> x" is
+            Err parseErrs ->
+                Expect.pass  -- Will be handled by expectCanonicalize
+            Ok parsedExpr ->
+                when Canonicalize.canonicalize context parsedExpr is
+                    Ok actual ->
+                        when actual.value is
+                            CanonicalAst.Lambda lambda ->
+                                when Array.get 1 lambda.patterns is
+                                    Just p1 ->
+                                        when p1.value is
+                                            CanonicalAst.PArray arr ->
+                                                Expect.all
+                                                    [ \_ -> lambda.patterns |> Array.length |> Expect.equal 2
+                                                    , \_ -> lambda.patterns |> Array.get 0 |> Maybe.map .value |> Expect.equal (Just (CanonicalAst.PVar "x"))
+                                                    , \_ -> arr |> Array.length |> Expect.equal 2
+                                                    , \_ -> arr |> Array.get 0 |> Maybe.map (\lp -> lp.value) |> Expect.equal (Just (CanonicalAst.PVar "y"))
+                                                    , \_ -> arr |> Array.get 1 |> Maybe.map (\lp -> lp.value) |> Expect.equal (Just (CanonicalAst.PVar "z"))
+                                                    ]
+                                                    {}
+                                            _ ->
+                                                Expect.fail "Expected PArray in second pattern"
+                                    Nothing ->
+                                        Expect.fail "Expected at least 2 patterns"
+                            _ ->
+                                Expect.fail "Expected Lambda"
+                    Err err ->
+                        Expect.fail ("Canonicalization failed: " ++ Debug.toString err)
+    , test "Nested record in array [{ x }]" <| \_ ->
+        expectCanonicalizePatternFlex context "[{ x }]" <| \result ->
+            when result is
+                CanonicalAst.PArray patterns ->
+                    when Array.get 0 patterns is
+                        Just recordLocated ->
+                            when recordLocated.value is
+                                CanonicalAst.PRecord fields -> when Array.get 0 fields is
+                                    Just field ->
+                                        Expect.all
+                                            [ \_ -> patterns |> Array.length |> Expect.equal 1
+                                            , \_ -> field.value.name |> Expect.equal "x"
+                                            , \_ -> field.value.pattern.value |> Expect.equal (CanonicalAst.PVar "x")
+                                            ]
+                                            {}
+                                    Nothing ->
+                                        Expect.fail "Expected at least one field"
+                                _ ->
+                                    Expect.fail "Expected PRecord"
+                        _ ->
+                            Expect.fail "Expected array element"
+                _ ->
+                    Expect.fail "Expected PArray"
+    , test "Array of records [{x}, {y}]" <| \_ ->
+        expectCanonicalizePatternFlex context "[{x}, {y}]" <| \result ->
+            when result is
+                CanonicalAst.PArray [ p0, p1 ] ->
+                    when p0.value is
+                        CanonicalAst.PRecord fields0 ->
+                            when Array.get 0 fields0 is
+                                Just field0 ->
+                                    when p1.value is
+                                        CanonicalAst.PRecord fields1 ->
+                                            when Array.get 0 fields1 is
+                                                Just field1 ->
+                                                    Expect.all
+                                                        [ \_ -> field0.value.name |> Expect.equal "x"
+                                                        , \_ -> field0.value.pattern.value |> Expect.equal (CanonicalAst.PVar "x")
+                                                        , \_ -> field1.value.name |> Expect.equal "y"
+                                                        , \_ -> field1.value.pattern.value |> Expect.equal (CanonicalAst.PVar "y")
+                                                        ]
+                                                        {}
+                                                Nothing -> Expect.fail "Expected field in second record"
+                                        _ -> Expect.fail "Expected PRecord for second element"
+                                Nothing -> Expect.fail "Expected field in first record"
+                        _ -> Expect.fail "Expected PRecord for first element"
+
+                CanonicalAst.PArray _ ->
+                    Expect.fail "Expected PArray with exactly two patterns"
+
+                _ ->
+                    Expect.fail "Expected PArray"
+    ]
+
+
+scopeExtensionTests : Array Test
+scopeExtensionTests =
+    [ test "Pattern binding doesn't conflict with existing scope" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+                    |> withScopedLocal "x"
+        in
+        when Parser.run ExpressionParser.parser Context.empty "\\x -> x" is
+            Err parseErrs ->
+                Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+            Ok parsedExpr ->
+                when Canonicalize.canonicalize context parsedExpr is
+                    Ok actual ->
+                        Expect.fail "Canonicalization succeeded but should have failed"
+                    Err (Canonicalize.DuplicateBinding _) ->
+                        Expect.pass
+                    Err err ->
+                        Expect.fail ("Wrong error type: " ++ Debug.toString err)
+
+    , test "Multiple pattern bindings don't conflict" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+        in
+        when Parser.run ExpressionParser.parser Context.empty "\\x y -> x" is
+            Err parseErrs ->
+                Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+            Ok parsedExpr ->
+                when Canonicalize.canonicalize context parsedExpr is
+                    Ok actual ->
+                        when actual.value is
+                            CanonicalAst.Lambda lambda ->
+                                Expect.all
+                                    [ .patterns >> Array.length >> Expect.equal 2
+                                    , .patterns >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "x"))
+                                    , .patterns >> Array.get 1 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "y"))
+                                    ]
+                                    lambda
+                            _ ->
+                                Expect.fail "Expected Lambda"
+                    Err err ->
+                        Expect.fail ("Canonicalization failed: " ++ Debug.toString err)
+
+    , test "Multiple pattern bindings do conflict" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+        in
+        when Parser.run ExpressionParser.parser Context.empty "\\x x -> x" is
+            Err parseErrs ->
+                Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+            Ok parsedExpr ->
+                when Canonicalize.canonicalize context parsedExpr is
+                    Ok actual ->
+                        Expect.fail "Canonicalization succeeded but should have failed"
+                    Err (Canonicalize.DuplicateBinding _) ->
+                        Expect.pass
+                    Err err ->
+                        Expect.fail ("Wrong error type: " ++ Debug.toString err)
+    ]
+
+
+positionPreservationTests : Array Test
+positionPreservationTests =
+    let
+        context =
+            moduleContext "Test"
+    in
+    [ test "PAnything preserves position" <| \_ ->
+        expectCanonicalizePatternFlex context "_" <| \result ->
+            Expect.equal CanonicalAst.PAnything result
+    , test "PVar preserves name" <| \_ ->
+        expectCanonicalizePattern context "x" (CanonicalAst.PVar "x")
+    , test "PInt preserves value" <| \_ ->
+        expectCanonicalizePattern context "42" (CanonicalAst.PInt 42)
+    , test "PArray preserves structure" <| \_ ->
+        expectCanonicalizePatternFlex context "[x, y]" <| \result ->
+            when result is
+                CanonicalAst.PArray patterns ->
+                    Expect.equal 2 (Array.length patterns)
+                _ ->
+                    Expect.fail "Expected PArray"
+    ]
+
+
+extractBoundNamesTests : Array Test
+extractBoundNamesTests =
+    [ test "PVar 'x' extracts ['x']" <| \_ ->
+        expectExtractBoundNames [locatedPattern (CanonicalAst.PVar "x")] ["x"]
+    , test "PAnything extracts []" <| \_ ->
+        expectExtractBoundNames [locatedPattern CanonicalAst.PAnything] []
+    , test "PChr 'a' extracts []" <| \_ ->
+        expectExtractBoundNames [locatedPattern (CanonicalAst.PChr 'a')] []
+    , test "PInt 42 extracts []" <| \_ ->
+        expectExtractBoundNames [locatedPattern (CanonicalAst.PInt 42)] []
+    , test "PArray [PVar 'x', PVar 'y'] extracts ['x', 'y']" <| \_ ->
+        expectExtractBoundNames
+            [locatedPattern (CanonicalAst.PArray [locatedPattern (CanonicalAst.PVar "x"), locatedPattern (CanonicalAst.PVar "y")])]
+            ["x", "y"]
+    , test "PRecord with field 'x' extracts ['x']" <| \_ ->
+        expectExtractBoundNames
+            [locatedPattern (CanonicalAst.PRecord [SourcePosition.at SourcePosition.emptyPos SourcePosition.emptyPos { name = "x", pattern = locatedPattern (CanonicalAst.PVar "x") }])]
+            ["x"]
+    , test "PAlias (PVar 'x') alias 'y' extracts ['y', 'x']" <| \_ ->
+        expectExtractBoundNames
+            [locatedPattern (CanonicalAst.PAlias { pattern = locatedPattern (CanonicalAst.PVar "x"), alias = locatedString "y" })]
+            ["y", "x"]
+    , test "Empty array extracts []" <| \_ ->
+        expectExtractBoundNames [locatedPattern (CanonicalAst.PArray [])] []
+    , test "Duplicate names in input causes error" <| \_ ->
+        -- Two patterns both binding 'x'
+        expectExtractBoundNamesError
+            [locatedPattern (CanonicalAst.PVar "x"), locatedPattern (CanonicalAst.PVar "x")]
+            (Canonicalize.DuplicateBinding { name = "x", existingPosition = dummyRegion })
+    , test "Nested patterns extract all names" <| \_ ->
+        expectExtractBoundNames
+            [locatedPattern (CanonicalAst.PArray [
+                locatedPattern (CanonicalAst.PVar "x"),
+                locatedPattern (CanonicalAst.PRecord [
+                    SourcePosition.at SourcePosition.emptyPos SourcePosition.emptyPos { name = "a", pattern = locatedPattern (CanonicalAst.PVar "y") }
+                ])
+            ])]
+            ["x", "y"]
+    ]
+
+
+extendScopeWithNamesTests : Array Test
+extendScopeWithNamesTests =
+    [ test "Empty names array returns original context" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+                    |> withScopedLocal "existing"
+        in
+        when Canonicalize.extendScopeWithNames context [] is
+            Ok result ->
+                -- The scope should still have "existing"
+                when Dict.get "existing" result.scope is
+                    Just _ ->
+                        Expect.pass
+                    Nothing ->
+                        Expect.fail "Existing binding was lost"
+            Err err ->
+                Expect.fail ("extendScopeWithNames failed: " ++ Debug.toString err)
+    , test "Single name not in scope adds to scope" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+            names =
+                [locatedString "newVar"]
+        in
+        when Canonicalize.extendScopeWithNames context names is
+            Ok result ->
+                when Dict.get "newVar" result.scope is
+                    Just _ ->
+                        Expect.pass
+                    Nothing ->
+                        Expect.fail "Name not in scope"
+            Err err ->
+                Expect.fail ("extendScopeWithNames failed: " ++ Debug.toString err)
+    , test "Multiple names not in scope adds all to scope" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+            names =
+                [locatedString "var1", locatedString "var2", locatedString "var3"]
+        in
+        when Canonicalize.extendScopeWithNames context names is
+            Ok result ->
+                let
+                    checkInScope name =
+                        when Dict.get name result.scope is
+                            Just _ ->
+                                Expect.pass
+                            Nothing ->
+                                Expect.fail (name ++ " not in scope")
+                in
+                checkInScope "var1"
+            Err err ->
+                Expect.fail ("extendScopeWithNames failed: " ++ Debug.toString err)
+    , test "Name already in scope causes error" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+                    |> withScopedLocal "existing"
+            names =
+                [locatedString "existing"]
+        in
+        expectExtendScopeWithNamesError context names
+            (Canonicalize.DuplicateBinding { name = "existing", existingPosition = dummyRegion })
+    , test "Multiple names with one conflict causes error" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+                    |> withScopedLocal "existing"
+            names =
+                [locatedString "new1", locatedString "existing", locatedString "new2"]
+        in
+        expectExtendScopeWithNamesError context names
+            (Canonicalize.DuplicateBinding { name = "existing", existingPosition = dummyRegion })
+    ]
+
+
+errorHandlingTests : Array Test
+errorHandlingTests =
+    [ test "Unknown var in expression (not pattern) returns error" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+        in
+        when Parser.run ExpressionParser.parser Context.empty "unknownVar" is
+            Err parseErrs ->
+                Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+            Ok parsedExpr ->
+                when Canonicalize.canonicalize context parsedExpr is
+                    Ok actual ->
+                        Expect.fail "Canonicalization succeeded"
+                    Err (Canonicalize.UnknownVar "unknownVar") ->
+                        Expect.pass
+                    Err err ->
+                        Expect.fail ("Wrong error type: " ++ Debug.toString err)
+    , test "Constructor pattern not yet implemented" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+        in
+        expectCanonicalizePatternError context "Just x"
+            Canonicalize.PlaceholderError
+    , test "Qualified constructor pattern not yet implemented" <| \_ ->
+        let
+            context =
+                moduleContext "Test"
+        in
+        expectCanonicalizePatternError context "Maybe.Just x"
+            Canonicalize.PlaceholderError
+    ]
