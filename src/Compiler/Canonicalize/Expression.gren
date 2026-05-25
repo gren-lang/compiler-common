@@ -91,6 +91,9 @@ canonicalize_ context expr =
         ParseAst.StringLiteral str ->
             Ok (CanonicalAst.Str str)
 
+        ParseAst.Negate innerExpr ->
+            Result.map CanonicalAst.Negate (canonicalize context innerExpr)
+
         ParseAst.Accessor str ->
             Ok (CanonicalAst.Accessor str)
 

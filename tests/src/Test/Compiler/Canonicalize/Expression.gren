@@ -39,6 +39,13 @@ tests =
                 expectPrim "\"hello\"" (CanonicalAst.Str "hello")
             , test "Accessor" <| \_ ->
                 expectPrim ".field" (CanonicalAst.Accessor "field")
+            , test "Negate" <| \_ ->
+                expectCanonicalizeFlex primContext "-42" <| \result ->
+                    when result is
+                        CanonicalAst.Negate expr ->
+                            Expect.equal (CanonicalAst.Int 42) expr.value
+                        _ ->
+                            Expect.fail "Expected Negate"
             , test "Parens" <| \_ ->
                 -- TODO: verify source position (it should be wrong with current impl)
                 expectPrim "(42)" (CanonicalAst.Int 42)
