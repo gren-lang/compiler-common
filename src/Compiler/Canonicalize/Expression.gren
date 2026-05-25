@@ -79,8 +79,8 @@ canonicalize_ context expr =
                 Number.Integer intVal ->
                     Ok (CanonicalAst.Int intVal)
 
-                Number.FloatingPoint floatVal ->
-                    Ok (CanonicalAst.Float floatVal)
+                Number.FloatingPoint { val } ->
+                    Ok (CanonicalAst.Float val)
 
                 Number.Hex hexVal ->
                     Ok (CanonicalAst.Int hexVal)
@@ -157,6 +157,29 @@ canonicalize_ context expr =
 
                 Nothing ->
                     Err (UnknownVar name)
+
+        ParseAst.Call { fn, args } ->
+            let
+                canonArgsResult =
+                    Array.foldr
+                        (\arg acc ->
+                            Result.map2
+                                (\canonArg canonArgs -> Array.pushFirst canonArg canonArgs)
+                                (canonicalize context arg)
+                                acc
+                        )
+                        (Ok [])
+                        args
+            in
+            Result.map2
+                (\canonFn canonArgs ->
+                    CanonicalAst.Call
+                        { fn = canonFn
+                        , args = canonArgs
+                        }
+                )
+                (canonicalize context fn)
+                canonArgsResult
 
         ParseAst.Let { defs, body } ->
             -- TODO: simplify

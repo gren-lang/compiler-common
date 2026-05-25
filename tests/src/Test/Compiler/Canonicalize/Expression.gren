@@ -220,6 +220,73 @@ tests =
                 in
                 expectCanonicalizeError context "unknownVar" (Canonicalize.UnknownVar "unknownVar")
             ]
+        , describe "Call expressions"
+            [ test "Simple function call with local variable" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "add"
+                in
+                expectCanonicalizeFlex context "add 1 2" <| \result ->
+                    when result is
+                        CanonicalAst.Call callResult ->
+                            Expect.all
+                                [ .fn >> .value >> Expect.equal (CanonicalAst.VarLocal "add")
+                                , .args >> Array.length >> Expect.equal 2
+                                , .args >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.Int 1))
+                                , .args >> Array.get 1 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.Int 2))
+                                ]
+                                callResult
+
+                        _ ->
+                            Expect.fail "Expected Call"
+            , test "Function call with nested calls" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "f"
+                            |> withScopedLocal "g"
+                in
+                expectCanonicalizeFlex context "f (g 1)" <| \result ->
+                    when result is
+                        CanonicalAst.Call callResult ->
+                            Expect.all
+                                [ .fn >> .value >> Expect.equal (CanonicalAst.VarLocal "f")
+                                , \r ->
+                                    when Array.get 0 callResult.args is
+                                        Just { value = CanonicalAst.Call { fn = innerFn } } ->
+                                            Expect.equal (CanonicalAst.VarLocal "g") innerFn.value
+
+                                        _ ->
+                                            Expect.fail "Expected inner Call"
+                                ]
+                                callResult
+
+                        _ ->
+                            Expect.fail "Expected Call"
+            , test "Function call with imported variable" <| \_ ->
+                let
+                    context =
+                        packageContext PackageName.core "Test"
+                            |> withQualifiedVar PackageName.core "Array" "map"
+                            |> withScopedImported "map" (qualifiedEntry PackageName.core "Array" dummyAnnotation)
+                            |> withScopedLocal "list"
+                            |> withScopedLocal "fn"
+                in
+                expectCanonicalizeFlex context "map fn list" <| \result ->
+                    when result is
+                        CanonicalAst.Call callResult ->
+                            Expect.all
+                                [ .fn >> .value >> Expect.equal (CanonicalAst.VarTopLevel { home = unsafeModuleName "Array", name = "map" })
+                                , .args >> Array.length >> Expect.equal 2
+                                , .args >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just <| CanonicalAst.VarLocal "fn")
+                                , .args >> Array.get 1 >> Maybe.map .value >> Expect.equal (Just <| CanonicalAst.VarLocal "list")
+                                ]
+                                callResult
+
+                        _ ->
+                            Expect.fail "Expected Call"
+            ]
         , describe "Unqualified vars from imports"
             [ test "VarTopLevel from same package import" <| \_ ->
                 let
