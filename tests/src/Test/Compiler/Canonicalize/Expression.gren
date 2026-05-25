@@ -287,6 +287,86 @@ tests =
                         _ ->
                             Expect.fail "Expected Call"
             ]
+        , describe "Lambda expressions"
+            [ test "Simple lambda with parameter" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "\\x -> x" <| \result ->
+                    when result is
+                        CanonicalAst.Lambda lambda ->
+                            Expect.all
+                                [ .patterns >> Array.length >> Expect.equal 1
+                                , .patterns >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "x"))
+                                , .expression >> .value >> Expect.equal (CanonicalAst.VarLocal "x")
+                                ]
+                                lambda
+
+                        _ ->
+                            Expect.fail "Expected Lambda"
+            , test "Lambda with multiple parameters" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "\\x y -> x" <| \result ->
+                    when result is
+                        CanonicalAst.Lambda lambda ->
+                            Expect.all
+                                [ .patterns >> Array.length >> Expect.equal 2
+                                , .patterns >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "x"))
+                                , .patterns >> Array.get 1 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "y"))
+                                , .expression >> .value >> Expect.equal (CanonicalAst.VarLocal "x")
+                                ]
+                                lambda
+
+                        _ ->
+                            Expect.fail "Expected Lambda"
+            , test "Lambda with constant body" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "\\x -> 42" <| \result ->
+                    when result is
+                        CanonicalAst.Lambda lambda ->
+                            Expect.all
+                                [ .patterns >> Array.length >> Expect.equal 1
+                                , .patterns >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "x"))
+                                , .expression >> .value >> Expect.equal (CanonicalAst.Int 42)
+                                ]
+                                lambda
+
+                        _ ->
+                            Expect.fail "Expected Lambda"
+            , test "Duplicate parameter names error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeError context "\\x x -> x"
+                    (Canonicalize.DuplicateBinding
+                        { name = "x"
+                        , existingPosition =
+                            { start = { row = 1, col = 2 }
+                            , end = { row = 1, col = 3 }
+                            }
+                        }
+                    )
+            , test "Parameter shadows existing binding error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "x"
+                in
+                expectCanonicalizeError context "\\x -> x"
+                    (Canonicalize.DuplicateBinding
+                        { name = "x"
+                        , existingPosition = dummyRegion
+                        }
+                    )
+            ]
         , describe "Unqualified vars from imports"
             [ test "VarTopLevel from same package import" <| \_ ->
                 let
