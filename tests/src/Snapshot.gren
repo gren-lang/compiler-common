@@ -1,0 +1,129 @@
+module Snapshot exposing
+    ( Config
+    , suite
+    --
+    , Test
+    , describe
+    , test
+    --
+    , Snapshot
+    , this
+    )
+
+
+import Bytes
+import FileSystem
+import FileSystem.Path as Path exposing (Path)
+import Test.Runner.Effectful as Effectful
+import Expect
+
+
+
+type alias Config =
+    { filesystemPermission : FileSystem.Permission
+    , folder : Path
+    , record : Bool
+    }
+
+
+type alias InternalConfig =
+    { filesystemPermission : FileSystem.Permission
+    , folder : Path
+    , namePrefix : String
+    , update : Bool
+    }
+
+
+type Test
+    = Describe { name : String, tests : Array Test }
+    | Test { name : String, thunk : {} -> Snapshot }
+
+
+type Snapshot
+    = Snapshot String
+
+
+suite : Config -> Array Test -> Effectful.Test
+suite config tests =
+    Effectful.concat <|
+        Array.map
+            (\t ->
+                resolve
+                    { filesystemPermission = config.filesystemPermission
+                    , folder = config.folder
+                    , namePrefix = "Suite"
+                    , update = config.record
+                    }
+                    t
+            )
+            tests
+    
+
+resolve : InternalConfig -> Test -> Effectful.Test
+resolve config test_ =
+    when test_ is
+        Describe { name, tests } ->
+            Effectful.describe name <|
+                Array.map
+                    (\t ->
+                        resolve
+                            { filesystemPermission = config.filesystemPermission
+                            , folder = config.folder
+                            , namePrefix = config.namePrefix ++ "_" ++ name
+                            , update = config.update
+                            }
+                            t
+                    )
+                    tests
+    
+        Test { name, thunk } ->
+            let
+                snapshotPath =
+                    config.namePrefix ++ "_" ++ name
+                        |> String.toLower
+                        |> String.map
+                            (\char ->
+                                if Char.isAlphaNum char then
+                                    char
+                                else
+                                    '_'
+                            )
+                        |> String.append ".snapshot"
+                        |> Path.fromPosixString
+                        |> Path.prepend config.folder
+
+                (Snapshot actual) =
+                    thunk {}
+            in
+            if config.update then
+                Effectful.await
+                    ("Saving snapshot for \"" ++ name ++ "\"")
+                    (FileSystem.writeFile config.filesystemPermission (Bytes.fromString actual) snapshotPath)
+                    <| \_ ->
+                        Effectful.test name <| \_ ->
+                            Expect.pass
+
+            else
+                Effectful.await
+                    ("Loading snapshot for \"" ++ name ++ "\"")
+                    (FileSystem.readFile config.filesystemPermission snapshotPath)
+                    <| \previousSnapshotBytes ->
+                        Effectful.test name <| \_ ->
+                            Expect.equal
+                                (Maybe.withDefault "" <| Bytes.toString previousSnapshotBytes)
+                                actual
+
+
+describe : String -> Array Test -> Test
+describe name tests =
+    Describe { name = name, tests = tests }
+
+
+test : String -> ({} -> Snapshot) -> Test
+test name thunk =
+    Test { name = name, thunk = thunk }
+
+
+this : a -> Snapshot
+this val =
+    Snapshot (Debug.toString val)

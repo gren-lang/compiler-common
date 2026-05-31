@@ -11,7 +11,8 @@
       ],
       "test": [
         "cd tests/",
-        "gren run Main"
+        "gren run Main",
+        "gren run SnapshotMain"
       ]
     }
   }
