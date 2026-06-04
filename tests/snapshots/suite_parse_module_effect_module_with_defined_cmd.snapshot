@@ -1,1 +1,48 @@
-Ok (Implementation { aliases = [], binops = [], docs = Nothing, effects = Manager (Cmd { end = { col = 48, row = 1 }, start = { col = 43, row = 1 }, value = "MyCmd" }), exports = Open, imports = [], name = { end = { col = 24, row = 1 }, start = { col = 15, row = 1 }, value = "CmdModule" }, requires = [], unions = [], values = [] })
+Ok 
+    (Implementation 
+        { aliases = 
+            [
+            ]
+        , binops = 
+            [
+            ]
+        , docs = Nothing
+        , effects = Manager 
+            (Cmd 
+                { end = 
+                    { col = 48
+                    , row = 1 
+                    }
+                , start = 
+                    { col = 43
+                    , row = 1 
+                    }
+                , value = "MyCmd" 
+                }
+            )
+        , exports = Open
+        , imports = 
+            [
+            ]
+        , name = 
+            { end = 
+                { col = 24
+                , row = 1 
+                }
+            , start = 
+                { col = 15
+                , row = 1 
+                }
+            , value = "CmdModule" 
+            }
+        , requires = 
+            [
+            ]
+        , unions = 
+            [
+            ]
+        , values = 
+            [
+            ] 
+        }
+    )

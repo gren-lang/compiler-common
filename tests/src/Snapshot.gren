@@ -16,6 +16,7 @@ import FileSystem
 import FileSystem.Path as Path exposing (Path)
 import Test.Runner.Effectful as Effectful
 import Expect
+import UnifiedDiff
 
 
 
@@ -108,10 +109,15 @@ resolve config test_ =
                     ("Loading snapshot for \"" ++ name ++ "\"")
                     (FileSystem.readFile config.filesystemPermission snapshotPath)
                     <| \previousSnapshotBytes ->
+                        let
+                            previous =
+                                Bytes.toString previousSnapshotBytes
+                                    |> Maybe.withDefault " "
+                        in
                         Effectful.test name <| \_ ->
-                            Expect.equal
-                                (Maybe.withDefault "" <| Bytes.toString previousSnapshotBytes)
-                                actual
+                            (Expect.equal previous actual
+                                |> Expect.onFail (UnifiedDiff.unifiedDiffStrings previous actual)
+                            )
 
 
 describe : String -> Array Test -> Test
@@ -126,4 +132,80 @@ test name thunk =
 
 this : a -> Snapshot
 this val =
-    Snapshot (Debug.toString val)
+    Snapshot (toStringPretty val)
+
+
+-- Inspired by: https://gist.github.com/roine/604e46a40cb6e4ae144533fbeb1aef2f
+toStringPretty : a -> String
+toStringPretty val =
+    val
+        |> Debug.toString
+        |> formatString False 0
+
+
+quote : String
+quote =
+    "\""
+
+
+indentChars : String
+indentChars =
+    "[{("
+
+
+outdentChars : String
+outdentChars =
+    "}])"
+
+
+newLineChars : String
+newLineChars =
+    ","
+
+
+incr : Int
+incr =
+    4
+
+
+formatString : Bool -> Int -> String -> String
+formatString isInQuotes indent str =
+    when String.takeFirst 1 str is
+        "" ->
+            ""
+
+        firstChar ->
+            if isInQuotes then
+                if firstChar == quote then
+                    firstChar
+                        ++ formatString (not isInQuotes) indent (String.dropFirst 1 str)
+
+                else
+                    firstChar
+                        ++ formatString isInQuotes indent (String.dropFirst 1 str)
+
+            else if String.contains firstChar newLineChars then
+                "\n"
+                    ++ String.repeat indent " "
+                    ++ firstChar
+                    ++ formatString isInQuotes indent (String.dropFirst 1 str)
+
+            else if String.contains firstChar indentChars then
+                "\n"
+                    ++ String.repeat (indent + incr) " "
+                    ++ firstChar
+                    ++ formatString isInQuotes (indent + incr) (String.dropFirst 1 str)
+
+            else if String.contains firstChar outdentChars then
+                "\n"
+                    ++ String.repeat indent " "
+                    ++ firstChar
+                    ++ formatString isInQuotes (indent - incr) (String.dropFirst 1 str)
+
+            else if firstChar == quote then
+                firstChar
+                    ++ formatString (not isInQuotes) indent (String.dropFirst 1 str)
+
+            else
+                firstChar
+                    ++ formatString isInQuotes indent (String.dropFirst 1 str)

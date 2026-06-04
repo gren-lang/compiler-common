@@ -12,7 +12,8 @@
             "gren-lang/compiler-common": "local:..",
             "gren-lang/core": "7.4.0",
             "gren-lang/test": "5.0.0",
-            "gren-lang/test-runner-node": "7.0.0"
+            "gren-lang/test-runner-node": "7.0.0",
+            "gilramir/gren-diff": "1.0.1"
         },
         "indirect": {
             "gren-lang/url": "6.0.0"

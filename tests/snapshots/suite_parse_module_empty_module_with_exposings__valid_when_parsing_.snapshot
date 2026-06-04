@@ -1,1 +1,87 @@
-Ok (Implementation { aliases = [], binops = [], docs = Nothing, effects = NoEffects, exports = Explicit [ExposedUpper { name = { end = { col = 33, row = 1 }, start = { col = 28, row = 1 }, value = "Model" }, privacy = Private }, ExposedUpper { name = { end = { col = 38, row = 1 }, start = { col = 35, row = 1 }, value = "Msg" }, privacy = Public }, ExposedOperator { end = { col = 48, row = 1 }, start = { col = 46, row = 1 }, value = "==" }, ExposedLower { end = { col = 55, row = 1 }, start = { col = 51, row = 1 }, value = "view" }], imports = [], name = { end = { col = 16, row = 1 }, start = { col = 8, row = 1 }, value = "MyModule" }, requires = [], unions = [], values = [] })
+Ok 
+    (Implementation 
+        { aliases = 
+            [
+            ]
+        , binops = 
+            [
+            ]
+        , docs = Nothing
+        , effects = NoEffects
+        , exports = Explicit 
+            [ExposedUpper 
+                { name = 
+                    { end = 
+                        { col = 33
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 28
+                        , row = 1 
+                        }
+                    , value = "Model" 
+                    }
+                , privacy = Private 
+                }
+            , ExposedUpper 
+                { name = 
+                    { end = 
+                        { col = 38
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 35
+                        , row = 1 
+                        }
+                    , value = "Msg" 
+                    }
+                , privacy = Public 
+                }
+            , ExposedOperator 
+                { end = 
+                    { col = 48
+                    , row = 1 
+                    }
+                , start = 
+                    { col = 46
+                    , row = 1 
+                    }
+                , value = "==" 
+                }
+            , ExposedLower 
+                { end = 
+                    { col = 55
+                    , row = 1 
+                    }
+                , start = 
+                    { col = 51
+                    , row = 1 
+                    }
+                , value = "view" 
+                }
+            ]
+        , imports = 
+            [
+            ]
+        , name = 
+            { end = 
+                { col = 16
+                , row = 1 
+                }
+            , start = 
+                { col = 8
+                , row = 1 
+                }
+            , value = "MyModule" 
+            }
+        , requires = 
+            [
+            ]
+        , unions = 
+            [
+            ]
+        , values = 
+            [
+            ] 
+        }
+    )

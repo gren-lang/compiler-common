@@ -1,1 +1,36 @@
-Ok (Implementation { aliases = [], binops = [], docs = Nothing, effects = NoEffects, exports = Open, imports = [], name = { end = { col = 16, row = 1 }, start = { col = 8, row = 1 }, value = "MyModule" }, requires = [], unions = [], values = [] })
+Ok 
+    (Implementation 
+        { aliases = 
+            [
+            ]
+        , binops = 
+            [
+            ]
+        , docs = Nothing
+        , effects = NoEffects
+        , exports = Open
+        , imports = 
+            [
+            ]
+        , name = 
+            { end = 
+                { col = 16
+                , row = 1 
+                }
+            , start = 
+                { col = 8
+                , row = 1 
+                }
+            , value = "MyModule" 
+            }
+        , requires = 
+            [
+            ]
+        , unions = 
+            [
+            ]
+        , values = 
+            [
+            ] 
+        }
+    )
