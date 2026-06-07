@@ -2,8 +2,9 @@ module Compiler.Canonicalize.Expression exposing
     ( Context
     , Error (..)
     , ScopeEntry (..)
-    , OneOrMoreQualifiedEntries
+    , OneOrMore
     , QualifiedEntry
+    , QualifiedCtor
     , canonicalize
     , canonicalizePattern
     , canonicalizeLetDef
@@ -28,6 +29,7 @@ type Error
     | InvalidModuleName String
     | ModuleNotFound String
     | UnknownVar String
+    | UnknownCtor String
     | AmbiguousVar { name : String, modules : Array { package : PackageName, module_ : ModuleName } }
     | NotExposed { mod : String, name : String }
     | DuplicateBinding { name : String, existingPosition : SourcePosition.Region }
@@ -46,14 +48,15 @@ type alias Context =
     { pkg : PackageName
     , currentModule : ModuleName
     -- Dict <qualifier> (Dict <name> entry)
-    , qualifiedVars : Dict String (Dict String OneOrMoreQualifiedEntries)
+    , qualifiedVars : Dict String (Dict String (OneOrMore QualifiedEntry))
+    , qualifiedCtors : Dict String (Dict String (OneOrMore QualifiedCtor))
     , scope : Dict String ScopeEntry
     }
 
 
-type alias OneOrMoreQualifiedEntries =
-    { first : QualifiedEntry
-    , rest : Array QualifiedEntry
+type alias OneOrMore a =
+    { first : a
+    , rest : Array a
     }
 
 
@@ -63,6 +66,16 @@ type alias QualifiedEntry =
      { module_ : ModuleName
      , package : PackageName
      , annotation : Annotation
+     }
+
+
+{-| Information about a qualified union constructor.
+-}
+type alias QualifiedCtor =
+     { module_ : ModuleName
+     , package : PackageName
+     , unionName : String
+     , union : CanonicalAst.Union
      }
 
 
@@ -299,9 +312,6 @@ canonicalize_ context expr =
 canonicalizePattern : Context -> ParseAst.Pattern -> Result Error CanonicalAst.Pattern
 canonicalizePattern context pat =
     when pat.value is
-        ParseAst.PVar name ->
-            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PVar name))
-
         ParseAst.PAnything _ ->
             Ok (SourcePosition.at pat.start pat.end CanonicalAst.PAnything)
 
@@ -313,6 +323,9 @@ canonicalizePattern context pat =
 
         ParseAst.PInt { value } ->
             Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PInt value))
+
+        ParseAst.PVar name ->
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PVar name))
 
         ParseAst.PArray patterns ->
             let
@@ -383,8 +396,13 @@ canonicalizePattern context pat =
                 )
                 (canonicalizePattern context pattern)
 
-        ParseAst.PCtor _ ->
-            Err PlaceholderError  -- TODO: implement constructor pattern resolution
+        ParseAst.PCtor opts ->
+            when Dict.get opts.name.value context.qualifiedCtors is
+                Nothing ->
+                    Err (UnknownCtor opts.name.value)
+
+                Just _ ->
+                    Err PlaceholderError  -- TODO: implement constructor pattern resolution
 
         ParseAst.PCtorQual _ ->
             Err PlaceholderError  -- TODO: implement qualified constructor pattern resolution

@@ -167,28 +167,28 @@ type alias Pattern =
 
 type Pattern_
   = PAnything
+  | PChr Char
+  | PStr String
+  | PInt Int
   | PVar String
-  | PRecord (Array PatternRecordField)
-  | PAlias
-    { pattern : Pattern
-    , alias : SourcePosition.Located String
-    }
-  | PArray (Array Pattern)
   | PBool
     { union : Union
     , bool : Bool
     }
-  | PChr Char
-  | PStr String
-  | PInt Int
+  | PArray (Array Pattern)
+  | PRecord (Array PatternRecordField)
   | PCtor
       { home : ModuleName
       , tipe : String
       , union : Union
       , name : String
       , index : Int
-      , args : Array PatternCtorArg
+      , arg : Maybe PatternCtorArg
       }
+  | PAlias
+    { pattern : Pattern
+    , alias : SourcePosition.Located String
+    }
 
 
 type alias PatternRecordField = SourcePosition.Located PatternRecordField_
@@ -198,8 +198,7 @@ type alias PatternRecordField_ = { name : String, pattern : Pattern }
 
 
 type alias PatternCtorArg =
-  { index : Int -- CACHE for destructors/errors
-  , tipe : Type -- CACHE for type inference
+  { tipe : Type -- CACHE for type inference
   , arg : Pattern
   }
 
@@ -244,7 +243,7 @@ type AliasType
   | Filled Type
 
 
--- NOTE: The Word16 marks the source order, but it may not be available
+-- NOTE: The Int marks the source order, but it may not be available
 -- for every canonical type. For example, if the canonical type is inferred
 -- the orders will all be zeros.
 type alias FieldType =
@@ -280,7 +279,7 @@ type alias Binop =
     }
 
 
-type Union = Union
+type alias Union =
   { vars : Array String
   , alts : Array Ctor
   , opts : CtorOpts -- CACHE which optimizations are available
@@ -296,7 +295,7 @@ type CtorOpts
 type alias Ctor =
     { name : String
     , index : Int
-    , args : Array Type
+    , arg : Maybe Type
     }
 
 

@@ -1,6 +1,6 @@
 module Test.Compiler.Canonicalize.Pattern exposing (tests)
 
-import Compiler.Canonicalize.Expression as Canonicalize exposing (Context, Error(..), QualifiedEntry, OneOrMoreQualifiedEntries)
+import Compiler.Canonicalize.Expression as Canonicalize exposing (Context, Error(..), OneOrMore, QualifiedEntry)
 import Compiler.Ast.Source as ParseAst
 import Compiler.Ast.Canonical as CanonicalAst exposing (Annotation, Type(..), FreeVars)
 import Compiler.Parse.Pattern as PatternParser
@@ -18,6 +18,10 @@ import Set exposing (Set)
 
 
 -- TODO: Review this more carefully!
+-- Inline describes
+-- Move test helpers to bottom
+-- Simplify
+-- Move relevant test helpers to external module
 
 
 tests : Test
@@ -28,6 +32,7 @@ tests =
         , describe "Array Patterns" arrayPatternTests
         , describe "Record Patterns" recordPatternTests
         , describe "Alias Patterns" aliasPatternTests
+        , describe "Ctor Patterns" ctorPatternTests
         , describe "Combined Patterns" combinedPatternTests
         , describe "Scope Extension Tests" scopeExtensionTests
         , describe "Source Position Preservation" positionPreservationTests
@@ -50,6 +55,7 @@ packageContext pkg currentModule =
     { pkg = pkg
     , currentModule = unsafeModuleName currentModule
     , qualifiedVars = Dict.empty
+    , qualifiedCtors = Dict.empty
     , scope = Dict.empty
     }
 
@@ -88,6 +94,15 @@ qualifiedEntry pkg moduleNameStr annotation =
     }
 
 
+qualifiedCtor : PackageName -> String -> String -> CanonicalAst.Union -> Canonicalize.QualifiedCtor
+qualifiedCtor pkg moduleNameStr unionName union =
+    { module_ = unsafeModuleName moduleNameStr
+    , package = pkg
+    , unionName = unionName
+    , union = union
+    }
+
+
 withScopedImported : String -> Canonicalize.QualifiedEntry -> Canonicalize.Context -> Canonicalize.Context
 withScopedImported name entry ctx =
     { ctx | scope =
@@ -122,6 +137,76 @@ withQualifiedVar pkg mod valueName ctx =
             ctx.qualifiedVars
     }
 
+
+withQualifiedCtors : PackageName -> String -> String -> Array CanonicalAst.Ctor -> Canonicalize.Context -> Canonicalize.Context
+withQualifiedCtors pkg mod unionName ctors startingCtx =
+    let
+        union =
+            unionFromCtors ctors
+    in
+    Array.foldl
+        (\ctor ctx ->
+            { ctx | qualifiedCtors =
+                Dict.update
+                    mod
+                    (\maybeMod ->
+                        when maybeMod is
+                            Just modValue ->
+                                Just <|
+                                    Dict.update
+                                        ctor.name
+                                        (\maybeValue ->
+                                            when maybeValue is
+                                                Just entry ->
+                                                    Just
+                                                        { entry
+                                                            | rest =
+                                                                Array.pushLast
+                                                                    (qualifiedCtor pkg mod unionName union)
+                                                                    entry.rest
+                                                            }
+
+                                                Nothing ->
+                                                    Just
+                                                        { first = qualifiedCtor pkg mod unionName union
+                                                        , rest = []
+                                                        }
+                                        )
+                                        modValue
+
+                            Nothing ->
+                                Just <|
+                                    Dict.singleton
+                                        ctor.name
+                                        { first = qualifiedCtor pkg mod unionName union
+                                        , rest = []
+                                        }
+                    )
+                    ctx.qualifiedCtors
+            }
+        )
+        startingCtx
+        ctors
+
+
+unionFromCtors : Array CanonicalAst.Ctor -> CanonicalAst.Union
+unionFromCtors ctors =
+    { vars =
+        ctors
+            |> Array.mapAndKeepJust .arg
+            |> Array.mapAndKeepJust
+                (\argType ->
+                    when argType is
+                        CanonicalAst.TVar n ->
+                            Just n
+
+                        _ ->
+                            Nothing
+                )
+    , alts = ctors
+    , opts = CanonicalAst.Normal
+    }
+    
 
 expectCanonicalizePattern : Canonicalize.Context -> String -> CanonicalAst.Pattern_ -> Expectation
 expectCanonicalizePattern context source expected =
@@ -222,6 +307,7 @@ patternLiteralTests =
         context =
             moduleContext "Test"
     in
+    -- TODO: PBool
     [ test "Wildcard pattern _" <| \_ ->
         expectCanonicalizePattern context "_" CanonicalAst.PAnything
     , test "Character literal 'a'" <| \_ ->
@@ -450,7 +536,6 @@ aliasPatternTests =
                         pa
                 _ ->
                     Expect.fail "Expected PAlias"
-
     , test "Alias with array [x] as xs" <| \_ ->
         expectCanonicalizePatternFlex context "[x] as xs" <| \result ->
             when result is
@@ -468,6 +553,43 @@ aliasPatternTests =
                         pa
                 _ ->
                     Expect.fail "Expected PAlias"
+    ]
+
+
+ctorPatternTests : Array Test
+ctorPatternTests =
+    let
+        rootContext =
+            moduleContext "Test"
+    in
+    [ test "Unqualified, no arg" <| \_ ->
+        let
+            myTypeCtors =
+                [ { name = "MyCtor"
+                  , index = 0
+                  , arg = Nothing
+                  }
+                ]
+                
+            context =
+                rootContext
+                    |> withQualifiedCtors PackageName.example "MyType" "MyType" myTypeCtors
+        in
+        expectCanonicalizePatternFlex context "MyCtor" <| \result ->
+            when result is
+                CanonicalAst.PCtor ctor ->
+                    Expect.equal
+                      { home = unsafeModuleName "MyType"
+                      , tipe = "MyType"
+                      , union = unionFromCtors myTypeCtors
+                      , name = "MyCtor"
+                      , index = 0
+                      , arg = Nothing
+                      }
+                      ctor
+
+                _ ->
+                    Expect.fail "Expected PCtor"
     ]
 
 
@@ -747,6 +869,7 @@ extendScopeWithNamesTests =
             context =
                 moduleContext "Test"
                     |> withScopedLocal "existing"
+
             names =
                 [locatedString "existing"]
         in
@@ -767,29 +890,13 @@ extendScopeWithNamesTests =
 
 errorHandlingTests : Array Test
 errorHandlingTests =
-    [ test "Unknown var in expression (not pattern) returns error" <| \_ ->
-        let
-            context =
-                moduleContext "Test"
-        in
-        when Parser.run ExpressionParser.parser Context.empty "unknownVar" is
-            Err parseErrs ->
-                Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
-            Ok parsedExpr ->
-                when Canonicalize.canonicalize context parsedExpr is
-                    Ok actual ->
-                        Expect.fail "Canonicalization succeeded"
-                    Err (Canonicalize.UnknownVar "unknownVar") ->
-                        Expect.pass
-                    Err err ->
-                        Expect.fail ("Wrong error type: " ++ Debug.toString err)
-    , test "Constructor pattern not yet implemented" <| \_ ->
+    [ test "Unknown Ctor returns relevant error" <| \_ ->
         let
             context =
                 moduleContext "Test"
         in
         expectCanonicalizePatternError context "Just x"
-            Canonicalize.PlaceholderError
+            (Canonicalize.UnknownCtor "Just")
     , test "Qualified constructor pattern not yet implemented" <| \_ ->
         let
             context =
