@@ -1,0 +1,128 @@
+module Test.Compiler.Canonicalize.Module exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import String.Parser.Advanced as Parser
+import Compiler.Canonicalize.Module as Canonicalize exposing (SourceModule, Error(..))
+import Compiler.Ast.Source as ParseAst
+import Compiler.Ast.Canonical as CanonicalAst
+import Compiler.Parse.Context exposing (Context)
+import Compiler.PackageName as PackageName
+import Compiler.Parse.Module as ModParser
+import Compiler.ModuleName as ModuleName
+import Compiler.SourcePosition as SourcePosition exposing (Position, Region, Located, at)
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Compiler.Parse.Module as ParseModule
+import Compiler.Parse.Context as Context exposing (Context)
+import Compiler.Parse.Number as Number
+import Dict exposing (Dict)
+import String.Parser.Advanced as Parser
+
+
+tests : Test
+tests =
+    describe "Compiler.Canonicalize.Module"
+        [ test "Simple value definition" <| \_ ->
+            let
+                parsedModules =
+                    parseModules
+                        [ { package = PackageName.example
+                          , source =
+                            """
+                            module MyModule exposing (..)
+
+                            x = 42
+                            """
+                          }
+                        ]
+            in
+            expect "MyModule" parsedModules
+                { name = unsafeModuleName "MyModule"
+                , exports =
+                    CanonicalAst.ExportEverything
+                        { start = { row = 1, col = 8 }
+                        , end = { row = 1, col = 16 }
+                        }
+                , decls =
+                    CanonicalAst.Declare
+                        { def =
+                            CanonicalAst.Def
+                                { name =
+                                    SourcePosition.at
+                                        { row = 3, col = 1 }
+                                        { row = 3, col = 2 }
+                                        "x"
+                                , params = []
+                                , body =
+                                    SourcePosition.at
+                                        { row = 3, col = 5 }
+                                        { row = 3, col = 7 }
+                                        (CanonicalAst.Int 42)
+                                }
+                        , decls = CanonicalAst.SaveTheEnvironment
+                        }
+                , unions = Dict.empty
+                , aliases = Dict.empty
+                , binops = Dict.empty
+                , effects = CanonicalAst.NoEffects
+                }
+        ]
+
+
+-- Helper to create a ModuleName from a string (unsafe, for tests only)
+-- Only use with valid module names like "MyModule"
+unsafeModuleName : String -> ModuleName.ModuleName
+unsafeModuleName str =
+    when ModuleName.fromString str is
+        Just mn ->
+            mn
+
+        Nothing ->
+            Debug.todo "Invalid module name in test"
+
+
+parseModules
+    : Array { package : PackageName, source : String }
+    -> Result (Array String) (Dict String Canonicalize.SourceModule)
+parseModules sources =
+    sources
+        |> Array.map
+            (\mod ->
+                when Parser.run ModParser.parser Context.empty mod.source is
+                    Ok parsedSource ->
+                        Ok
+                            { package = mod.package
+                            , ast = parsedSource
+                            }
+
+                    Err errs ->
+                        Err <| ModParser.errorsToString mod.source errs
+            )
+        |> Result.allOk
+        |> Result.map
+            (\mods ->
+                Array.foldl
+                    (\mod dict -> Dict.set (ParseAst.moduleName mod.ast).value mod dict )
+                    Dict.empty
+                    mods
+            )
+
+
+expect : String -> Result (Array String) (Dict String Canonicalize.SourceModule) -> CanonicalAst.Module -> Expectation
+expect modName result expected =
+    when result is
+        Err parseErrs ->
+            Expect.fail <| String.join "\n\n" parseErrs
+
+        Ok parsedMods ->
+            when Canonicalize.canonicalize PackageName.example parsedMods Dict.empty is
+                Err canErrs ->
+                    Expect.fail (Debug.toString canErrs)
+
+                Ok mods ->
+                    when Dict.get modName mods is
+                        Just actual ->
+                            Expect.equal expected actual
+
+                        Nothing ->
+                            Expect.fail <| "Expected module '" ++ modName ++ "' in result dict"

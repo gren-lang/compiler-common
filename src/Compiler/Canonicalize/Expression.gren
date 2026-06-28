@@ -1,0 +1,720 @@
+module Compiler.Canonicalize.Expression exposing
+    ( Context
+    , Error (..)
+    , ScopeEntry (..)
+    , OneOrMore
+    , QualifiedEntry
+    , QualifiedCtor
+    , canonicalize
+    , canonicalizePattern
+    , canonicalizeLetDef
+    , canonicalizeRecordField
+    , extractBoundNames
+    , extendScopeWithNames
+    )
+
+
+import Compiler.Ast.Source as ParseAst
+import Compiler.Ast.Canonical as CanonicalAst exposing (Annotation)
+import Compiler.Parse.Number as Number
+import Compiler.SourcePosition as SourcePosition
+import Compiler.ModuleName as ModuleName exposing (ModuleName)
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Dict exposing (Dict)
+import Set exposing (Set)
+
+
+type Error
+    = PlaceholderError
+    | InvalidModuleName String
+    | ModuleNotFound String
+    | UnknownVar String
+    | UnknownCtor String
+    | AmbiguousVar { name : String, modules : Array { package : PackageName, module_ : ModuleName } }
+    | NotExposed { mod : String, name : String }
+    | DuplicateBinding { name : String, existingPosition : SourcePosition.Region }
+
+
+{-| Entry in the scope dictionary, representing how an unqualified name resolves.
+-}
+type ScopeEntry
+    = Local { position : SourcePosition.Region }
+    | Imported { entry : QualifiedEntry, position : SourcePosition.Region }
+
+
+{-| Context for canonicalization:
+-}
+type alias Context =
+    { pkg : PackageName
+    , currentModule : ModuleName
+    -- Dict <qualifier> (Dict <name> entry)
+    , qualifiedVars : Dict String (Dict String (OneOrMore QualifiedEntry))
+    , qualifiedCtors : Dict String (Dict String (OneOrMore QualifiedCtor))
+    , scope : Dict String ScopeEntry
+    }
+
+
+type alias OneOrMore a =
+    { first : a
+    , rest : Array a
+    }
+
+
+{-| Information about a qualified variable entry.
+-}
+type alias QualifiedEntry =
+     { module_ : ModuleName
+     , package : PackageName
+     , annotation : Annotation
+     }
+
+
+{-| Information about a qualified union constructor.
+-}
+type alias QualifiedCtor =
+     { module_ : ModuleName
+     , package : PackageName
+     , unionName : String
+     , union : CanonicalAst.Union
+     }
+
+
+{-| Canonicalize a single expression.
+-}
+canonicalize : Context -> ParseAst.Expression -> Result Error CanonicalAst.Expression
+canonicalize context expr =
+    canonicalize_ context expr.value
+        |> Result.map (SourcePosition.at expr.start expr.end)
+
+
+canonicalize_ : Context -> ParseAst.Expression_ -> Result Error CanonicalAst.Expression_
+canonicalize_ context expr =
+    when expr is
+        ParseAst.NumberLiteral numberOutcome ->
+            when numberOutcome is
+                Number.Integer intVal ->
+                    Ok (CanonicalAst.Int intVal)
+
+                Number.FloatingPoint { val } ->
+                    Ok (CanonicalAst.Float val)
+
+                Number.Hex hexVal ->
+                    Ok (CanonicalAst.Int hexVal)
+
+        ParseAst.CharLiteral char ->
+            Ok (CanonicalAst.Chr char)
+
+        ParseAst.StringLiteral str ->
+            Ok (CanonicalAst.Str str)
+
+        ParseAst.Negate innerExpr ->
+            Result.map CanonicalAst.Negate (canonicalize context innerExpr)
+
+        ParseAst.Accessor str ->
+            Ok (CanonicalAst.Accessor str)
+
+        ParseAst.Parens innerExpr ->
+            canonicalize_ context innerExpr.value
+
+        ParseAst.VarQual { qualifier, name } ->
+            if String.startsWith "Gren.Kernel." qualifier then
+                -- TODO: verify existance of module?
+                Ok (CanonicalAst.VarKernel { kernelModule = qualifier, name = name })
+
+            else
+                when Dict.get qualifier context.qualifiedVars is
+                    Just innerDict ->
+                        when Dict.get name innerDict is
+                            Just { first = entry, rest = [] } ->
+                                    if entry.package == PackageName.core && ModuleName.toString entry.module_ == "Debug" then
+                                        Ok (CanonicalAst.VarDebug { home = entry.module_, name = name, annotation = entry.annotation })
+
+                                    else if entry.package == context.pkg then
+                                        Ok (CanonicalAst.VarTopLevel { home = entry.module_, name = name })
+
+                                    else
+                                        Ok (CanonicalAst.VarForeign { home = entry.module_, name = name, annotation = entry.annotation })
+
+                            Just { first, rest } ->
+                                let
+                                    mods =
+                                        Array.pushFirst first rest
+                                            |> Array.map (\e -> { package = e.package, module_ = e.module_ })
+                                in
+                                Err (AmbiguousVar { name = name, modules = mods })
+
+                            Nothing ->
+                                Err (NotExposed { mod = qualifier, name = name })
+
+                    Nothing ->
+                        Err (ModuleNotFound qualifier)
+
+        ParseAst.Var { name } ->
+            -- Handle unqualified names from scope (locals, imports, top-level)
+            when Dict.get name context.scope is
+                Just (Local localEntry) ->
+                    Ok (CanonicalAst.VarLocal name)
+
+                Just (Imported importedEntry) ->
+                    let
+                        entry =
+                            importedEntry.entry
+                        moduleStr =
+                            ModuleName.toString entry.module_
+                    in
+                    if String.startsWith "Gren.Kernel." moduleStr then
+                        Ok (CanonicalAst.VarKernel { kernelModule = moduleStr, name = name })
+
+                    else if entry.package == PackageName.core && moduleStr == "Debug" then
+                        Ok (CanonicalAst.VarDebug { home = entry.module_, name = name, annotation = entry.annotation })
+
+                    else if entry.package == context.pkg then
+                        Ok (CanonicalAst.VarTopLevel { home = entry.module_, name = name })
+
+                    else
+                        Ok (CanonicalAst.VarForeign { home = entry.module_, name = name, annotation = entry.annotation })
+
+                Nothing ->
+                    Err (UnknownVar name)
+
+        ParseAst.Call { fn, args } ->
+            let
+                canonArgsResult =
+                    Array.foldr
+                        (\arg acc ->
+                            Result.map2
+                                (\canonArg canonArgs -> Array.pushFirst canonArg canonArgs)
+                                (canonicalize context arg)
+                                acc
+                        )
+                        (Ok [])
+                        args
+            in
+            Result.map2
+                (\canonFn canonArgs ->
+                    CanonicalAst.Call
+                        { fn = canonFn
+                        , args = canonArgs
+                        }
+                )
+                (canonicalize context fn)
+                canonArgsResult
+
+        ParseAst.Lambda { patterns, body } ->
+            canonicalizeLambda context patterns body
+
+        ParseAst.Let { defs, body } ->
+            -- TODO: simplify
+            -- TODO: Add parameter scoping for function definitions
+            -- TODO: Add top-level function name in scope for recursive calls
+            -- TODO: Add destructuring pattern support for let-bindings
+            let
+                -- Build extended scope with duplicate checking
+                extendedScopeResult =
+                    Array.foldl
+                        (\def accResult ->
+                            let
+                                nameDef =
+                                    getLetDefName def
+
+                                name =
+                                    nameDef.value
+                            in
+                            Result.andThen
+                                (\scope ->
+                                    when Dict.get name scope is
+                                        Just existingEntry ->
+                                            let
+                                                existingPosition =
+                                                    when existingEntry is
+                                                        Local local ->
+                                                            local.position
+
+                                                        Imported imported ->
+                                                            imported.position
+                                            in
+                                            Err
+                                                (DuplicateBinding
+                                                    { name = name
+                                                    , existingPosition = existingPosition
+                                                    }
+                                                )
+
+                                        Nothing ->
+                                            let
+                                                entry =
+                                                    Local
+                                                        { position = { start = nameDef.start, end = nameDef.end } }
+                                            in
+                                            Ok (Dict.set name entry scope)
+                                )
+                                accResult
+                        )
+                        (Ok context.scope)
+                        defs
+            in
+            Result.andThen
+                (\extendedScope ->
+                    let
+                        extendedContext =
+                            { context | scope = extendedScope }
+
+                        -- Canonicalize all definitions with the extended scope
+                        canonicalDefsResult =
+                            Array.foldl
+                                (\def acc ->
+                                    Result.andThen
+                                        (\currentDefs ->
+                                            Result.map
+                                                (\d -> Array.pushLast d currentDefs)
+                                                (canonicalizeLetDef extendedContext def)
+                                        )
+                                        acc
+                                )
+                                (Ok [])
+                                defs
+                    in
+                    Result.andThen
+                        (\canonicalDefs ->
+                            -- Canonicalize body with extended scope
+                            Result.andThen
+                                (\canonicalBody ->
+                                    if Array.length canonicalDefs == 1 then
+                                        when Array.get 0 canonicalDefs is
+                                            Just singleDef ->
+                                                Ok (CanonicalAst.Let
+                                                    { def = singleDef
+                                                    , body = canonicalBody
+                                                    }
+                                                )
+                                            Nothing ->
+                                                Err PlaceholderError
+                                    else
+                                        Ok (CanonicalAst.LetRec
+                                            { defs = canonicalDefs
+                                            , body = canonicalBody
+                                            }
+                                        )
+                                )
+                                (canonicalize extendedContext body)
+                        )
+                        canonicalDefsResult
+                )
+                extendedScopeResult
+
+        _ ->
+            Err PlaceholderError
+
+
+-- Pattern Canonicalization
+
+
+canonicalizePattern : Context -> ParseAst.Pattern -> Result Error CanonicalAst.Pattern
+canonicalizePattern context pat =
+    when pat.value is
+        ParseAst.PAnything _ ->
+            Ok (SourcePosition.at pat.start pat.end CanonicalAst.PAnything)
+
+        ParseAst.PChr c ->
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PChr c))
+
+        ParseAst.PStr s ->
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PStr s))
+
+        ParseAst.PInt { value } ->
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PInt value))
+
+        ParseAst.PVar name ->
+            Ok (SourcePosition.at pat.start pat.end (CanonicalAst.PVar name))
+
+        ParseAst.PArray patterns ->
+            let
+                canonPatternsResult =
+                    Array.foldl
+                        (\subPat acc ->
+                            Result.andThen
+                                (\current ->
+                                    Result.map
+                                        (\cp -> Array.pushLast cp current)
+                                        (canonicalizePattern context subPat)
+                                )
+                                acc
+                        )
+                        (Ok [])
+                        patterns
+            in
+            Result.map
+                (\canonPatterns ->
+                    SourcePosition.at pat.start pat.end (CanonicalAst.PArray canonPatterns)
+                )
+                canonPatternsResult
+
+        ParseAst.PRecord fields ->
+            -- Normalize fields: replace Nothing patterns with PVar fieldName
+            let
+                normalizedFields =
+                    Array.map
+                        (\field ->
+                            when field.pattern is
+                                Nothing ->
+                                    { field | pattern = Just (SourcePosition.at field.field.start field.field.end (ParseAst.PVar field.field.value)) }
+
+                                Just _ ->
+                                    field
+                        )
+                        fields
+
+                canonFieldsResult =
+                    Array.foldl
+                        (\field acc ->
+                            Result.andThen
+                                (\current ->
+                                    Result.map
+                                        (\cf -> Array.pushLast cf current)
+                                        (canonicalizeRecordField context field)
+                                )
+                                acc
+                        )
+                        (Ok [])
+                        normalizedFields
+            in
+            Result.map
+                (\canonFields ->
+                    SourcePosition.at pat.start pat.end (CanonicalAst.PRecord canonFields)
+                )
+                canonFieldsResult
+
+        ParseAst.PAlias { pattern, name } ->
+            Result.map
+                (\canonPattern ->
+                    SourcePosition.at pat.start pat.end (
+                        CanonicalAst.PAlias
+                            { pattern = canonPattern
+                            , alias = name
+                            }
+                    )
+                )
+                (canonicalizePattern context pattern)
+
+        ParseAst.PCtor opts ->
+            when Dict.get opts.name.value context.qualifiedCtors is
+                Nothing ->
+                    Err (UnknownCtor opts.name.value)
+
+                Just _ ->
+                    Err PlaceholderError  -- TODO: implement constructor pattern resolution
+
+        ParseAst.PCtorQual _ ->
+            Err PlaceholderError  -- TODO: implement qualified constructor pattern resolution
+
+
+canonicalizeRecordField : Context -> ParseAst.PRecordField -> Result Error CanonicalAst.PatternRecordField
+canonicalizeRecordField context field =
+    when field.pattern is
+        Just p ->
+            Result.map
+                (\canonPattern ->
+                    -- Field position spans from field name to end of pattern
+                    let
+                        fieldEnd =
+                            if p.end.col > field.field.end.col || p.end.row > field.field.end.row then
+                                p.end
+                            else
+                                field.field.end
+                    in
+                    SourcePosition.at field.field.start fieldEnd { name = field.field.value, pattern = canonPattern }
+                )
+                (canonicalizePattern context p)
+
+        Nothing ->
+            -- Shouldn't happen due to normalization in PRecord case
+            Err PlaceholderError
+
+
+-- Helpers
+
+
+-- Scope extension functions for pattern canonicalization
+
+
+{-| Extract all bound names from canonical patterns.
+Checks for duplicate bindings within the pattern list.
+-}
+extractBoundNames : Array CanonicalAst.Pattern -> Result Error (Array (SourcePosition.Located String))
+extractBoundNames patterns =
+    let
+        extractFromPattern : CanonicalAst.Pattern -> Array (SourcePosition.Located String)
+        extractFromPattern locatedPat =
+            when locatedPat.value is
+                CanonicalAst.PVar name ->
+                    [SourcePosition.at locatedPat.start locatedPat.end name]
+
+                CanonicalAst.PAnything ->
+                    []
+
+                CanonicalAst.PChr _ ->
+                    []
+
+                CanonicalAst.PStr _ ->
+                    []
+
+                CanonicalAst.PInt _ ->
+                    []
+
+                CanonicalAst.PRecord fields ->
+                    Array.foldl
+                        (\field acc ->
+                            acc ++ (extractFromRecordField field)
+                        )
+                        []
+                        fields
+
+                CanonicalAst.PArray subPatterns ->
+                    Array.foldl
+                        (\subPat acc ->
+                            acc ++ (extractFromPattern subPat)
+                        )
+                        []
+                        subPatterns
+
+                CanonicalAst.PAlias pa ->
+                    Array.pushFirst pa.alias (extractFromPattern pa.pattern)
+
+                CanonicalAst.PBool _ ->
+                    []
+
+                CanonicalAst.PCtor _ ->
+                    []  -- TODO: implement when we add constructor support
+
+        extractFromRecordField : CanonicalAst.PatternRecordField -> Array (SourcePosition.Located String)
+        extractFromRecordField locatedField =
+            extractFromPattern locatedField.value.pattern
+    in
+    Array.foldl
+        (\locatedPat accResult ->
+            Result.andThen
+                (\acc ->
+                    let
+                        names =
+                            extractFromPattern locatedPat
+
+                        checkForDuplicates : Array (SourcePosition.Located String) -> Array (SourcePosition.Located String) -> Result Error (Array (SourcePosition.Located String))
+                        checkForDuplicates newNames existingNames =
+                            if Array.isEmpty newNames then
+                                Ok existingNames
+
+                            else
+                                let
+                                    name =
+                                        when Array.get 0 newNames is
+                                            Just n -> n
+                                            Nothing -> SourcePosition.at SourcePosition.emptyPos SourcePosition.emptyPos ""
+                                    rest =
+                                        if Array.length newNames > 1 then
+                                            Array.slice 1 (Array.length newNames) newNames
+                                        else
+                                            []
+                                    -- Find first existing name with same value
+                                    foundExisting =
+                                        Array.foldl
+                                            (\n existing ->
+                                                if existing == Nothing && n.value == name.value then
+                                                    Just n
+                                                else
+                                                    existing
+                                            )
+                                            Nothing
+                                            existingNames
+                                in
+                                when foundExisting is
+                                    Just existingName ->
+                                        Err (DuplicateBinding { name = name.value, existingPosition = { start = existingName.start, end = existingName.end } })
+                                    Nothing ->
+                                        if Array.any (\n -> n.value == name.value) existingNames then
+                                            Err PlaceholderError
+                                        else
+                                            checkForDuplicates rest (Array.pushLast name existingNames)
+                    in
+                    checkForDuplicates names acc
+                )
+                accResult
+        )
+        (Ok [])
+        patterns
+
+
+{-| Extend the context's scope with the given bound names.
+Checks for conflicts with existing bindings.
+-}
+extendScopeWithNames : Context -> Array (SourcePosition.Located String) -> Result Error Context
+extendScopeWithNames context names =
+    Array.foldl
+        (\locatedName accResult ->
+            Result.andThen
+                (\currentContext ->
+                    when Dict.get locatedName.value currentContext.scope is
+                        Just existingEntry ->
+                            let
+                                existingPosition =
+                                    when existingEntry is
+                                        Local localEntry ->
+                                            localEntry.position
+
+                                        Imported importedEntry ->
+                                            importedEntry.position
+                            in
+                            Err (DuplicateBinding { name = locatedName.value, existingPosition = existingPosition })
+
+                        Nothing ->
+                            let
+                                newScope =
+                                    Dict.set locatedName.value (Local { position = { start = locatedName.start, end = locatedName.end } }) currentContext.scope
+                            in
+                            Ok { currentContext | scope = newScope }
+                )
+                accResult
+        )
+        (Ok context)
+        names
+
+
+canonicalizeLambda : Context -> Array ParseAst.Pattern -> ParseAst.Expression -> Result Error CanonicalAst.Expression_
+canonicalizeLambda context patterns body =
+    -- Step 1: Canonicalize patterns
+    let
+        canonPatternsResult =
+            Array.foldl
+                (\pat acc ->
+                    Result.andThen
+                        (\current ->
+                            Result.map
+                                (\p -> Array.pushLast p current)
+                                (canonicalizePattern context pat)
+                        )
+                        acc
+                )
+                (Ok [])
+                patterns
+    in
+    Result.andThen
+        (\canonPatterns ->
+            -- Step 2: Extract bound names from canonical patterns and extend scope
+            Result.andThen
+                (\extendedContext ->
+                    -- Step 3: Canonicalize body with extended scope
+                    Result.map
+                        (\canonBody ->
+                            CanonicalAst.Lambda
+                                { patterns = canonPatterns
+                                , expression = canonBody
+                                }
+                        )
+                        (canonicalize extendedContext body)
+                )
+                (Result.andThen
+                    (\names ->
+                        extendScopeWithNames context names
+                    )
+                    (extractBoundNames canonPatterns)
+                )
+        )
+        canonPatternsResult
+
+
+getLetDefName : SourcePosition.Located ParseAst.Def -> SourcePosition.Located String
+getLetDefName def =
+    when def.value is
+        ParseAst.Define record ->
+            record.name
+
+        ParseAst.Destruct { pattern, body } ->
+            when pattern.value is
+                ParseAst.PVar name -> SourcePosition.at pattern.start pattern.end name
+                _ -> Debug.todo "Non-PVar destruct patterns not yet supported in Let"
+
+
+canonicalizeLetDef : Context -> SourcePosition.Located ParseAst.Def -> Result Error CanonicalAst.Def
+canonicalizeLetDef context def =
+    -- TODO: simplify
+    when def.value is
+        ParseAst.Define record ->
+            -- Step 1: Canonicalize parameter patterns
+            let
+                canonParamsResult =
+                    Array.foldl
+                        (\pat acc ->
+                            Result.andThen
+                                (\currentParams ->
+                                    Result.map
+                                        (\p -> Array.append currentParams [p])
+                                        (canonicalizePattern context pat)
+                                )
+                                acc
+                        )
+                        (Ok [])
+                        record.args
+            in
+            Result.andThen
+                (\canonParams ->
+                    -- Step 2: Extract bound names from parameters and extend scope
+                    Result.andThen
+                        (\extendedContext ->
+                            -- Step 3: Canonicalize body with extended scope
+                            Result.map
+                                (\canonBody ->
+                                    CanonicalAst.Def
+                                        { name = record.name
+                                        , params = canonParams
+                                        , body = canonBody
+                                        }
+                                )
+                                (canonicalize extendedContext record.body)
+                        )
+                        (Result.andThen
+                            (\names ->
+                                extendScopeWithNames context names
+                            )
+                            (extractBoundNames canonParams)
+                        )
+                )
+                canonParamsResult
+
+        ParseAst.Destruct { pattern, body } ->
+            -- Step 1: Canonicalize the pattern
+            Result.andThen
+                (\canonPattern ->
+                    -- Step 2: Extract bound names from pattern and extend scope
+                    Result.andThen
+                        (\names ->
+                            Result.andThen
+                                (\extendedContext ->
+                                    -- Step 3: Canonicalize body with extended scope
+                                    -- For Destruct, we create a Def with the pattern's bound name as the def name
+                                    -- This is a simplification - proper destructuring would need more work
+                                    Result.map
+                                        (\canonBody ->
+                                            if Array.length names == 1 then
+                                                let
+                                                    nameLoc =
+                                                        when Array.get 0 names is
+                                                            Just n -> n
+                                                            Nothing -> SourcePosition.at pattern.start pattern.end ""
+                                                in
+                                                Ok (CanonicalAst.Def
+                                                    { name = nameLoc
+                                                    , params = []
+                                                    , body = canonBody
+                                                    }
+                                                )
+                                            else
+                                                -- Multiple bindings from destructuring - not yet supported
+                                                Err PlaceholderError
+                                        )
+                                        (canonicalize extendedContext body)
+                                )
+                                (extendScopeWithNames context names)
+                        )
+                        (extractBoundNames [canonPattern])
+                )
+                (canonicalizePattern context pattern)
+                |> Result.andThen Basics.identity

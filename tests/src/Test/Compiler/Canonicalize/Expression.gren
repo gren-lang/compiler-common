@@ -1,0 +1,554 @@
+module Test.Compiler.Canonicalize.Expression exposing (tests)
+
+import Compiler.Canonicalize.Expression as Canonicalize exposing (QualifiedEntry)
+import Compiler.Ast.Source as ParseAst
+import Compiler.Ast.Canonical as CanonicalAst exposing (Annotation, Type(..), FreeVars)
+import Compiler.Parse.Expression as ExpressionParser
+import Compiler.Parse.Context as Context exposing (Context)
+import Compiler.SourcePosition as SourcePosition
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Compiler.ModuleName as ModuleName exposing (ModuleName)
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import String.Parser.Advanced as Parser
+import Array exposing (Array)
+import Dict exposing (Dict)
+import Set exposing (Set)
+
+
+tests : Test
+tests =
+    describe "Compiler.Canonicalize.Expression"
+        [ describe "Simple 1:1 mappings" <|
+            let
+                primContext =
+                    moduleContext "Test"
+
+                expectPrim inp outp =
+                    expectCanonicalize primContext inp outp
+            in
+            [ test "Integer" <| \_ ->
+                expectPrim "42" (CanonicalAst.Int 42)
+            , test "FloatingPoint" <| \_ ->
+                expectPrim "3.14" (CanonicalAst.Float 3.14)
+            , test "Hex" <| \_ ->
+                expectPrim "0xFF" (CanonicalAst.Int 255)
+            , test "CharLiteral" <| \_ ->
+                expectPrim "'x'" (CanonicalAst.Chr 'x')
+            , test "StringLiteral" <| \_ ->
+                expectPrim "\"hello\"" (CanonicalAst.Str "hello")
+            , test "Accessor" <| \_ ->
+                expectPrim ".field" (CanonicalAst.Accessor "field")
+            , test "Negate" <| \_ ->
+                expectCanonicalizeFlex primContext "-42" <| \result ->
+                    when result is
+                        CanonicalAst.Negate expr ->
+                            Expect.equal (CanonicalAst.Int 42) expr.value
+                        _ ->
+                            Expect.fail "Expected Negate"
+            , test "Parens" <| \_ ->
+                -- TODO: verify source position (it should be wrong with current impl)
+                expectPrim "(42)" (CanonicalAst.Int 42)
+            ]
+        , describe "VarQual"
+            [ test "Kernel module" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                -- TODO: Check that the module exists
+                expectCanonicalize context "Gren.Kernel.Basics.add"
+                    (CanonicalAst.VarKernel
+                        { kernelModule = "Gren.Kernel.Basics"
+                        , name = "add"
+                        }
+                    )
+            , test "External module in same package" <| \_ ->
+                let
+                    context =
+                        packageContext PackageName.core "Test"
+                            |> withQualifiedVar PackageName.core "Array" "map"
+                in
+                expectCanonicalize context "Array.map"
+                    (CanonicalAst.VarTopLevel
+                        { home = unsafeModuleName "Array"
+                        , name = "map"
+                        }
+                    )
+            , test "External module in foreign package" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withQualifiedVar PackageName.node "External" "func"
+                in
+                expectCanonicalize context "External.func"
+                    (CanonicalAst.VarForeign
+                        { home = unsafeModuleName "External"
+                        , name = "func"
+                        , annotation = dummyAnnotation
+                        }
+                    )
+            , test "Var in Debug module" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withQualifiedVar PackageName.core "Debug" "log"
+                in
+                expectCanonicalize context "Debug.log"
+                    (CanonicalAst.VarDebug
+                        { home = unsafeModuleName "Debug"
+                        , name = "log"
+                        , annotation = dummyAnnotation
+                        }
+                    )
+            , test "ModuleNotFound error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeError context "NonExistent.func"
+                    (Canonicalize.ModuleNotFound "NonExistent")
+            , test "NotExposed error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withQualifiedVar PackageName.node "External" "func"
+                in
+                expectCanonicalizeError context "External.privateFunc"
+                    (Canonicalize.NotExposed { mod = "External", name = "privateFunc" })
+            , test "AmbigiousVar error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withQualifiedVar PackageName.node "External" "func"
+                            |> withQualifiedVar PackageName.core "External" "func"
+                in
+                expectCanonicalizeError context "External.func"
+                    (Canonicalize.AmbiguousVar
+                        { name = "func"
+                        , modules =
+                            [ { package = PackageName.node
+                              , module_ = unsafeModuleName "External"
+                              }
+                            , { package = PackageName.core
+                              , module_ = unsafeModuleName "External"
+                              }
+                            ]
+                        }
+                    )
+            ]
+        , describe "Let expressions"
+            [ test "Let variable is in scope in body" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "let y = 1 in y" <| \result ->
+                    when result is
+                        CanonicalAst.Let letOpts ->
+                            Expect.all
+                                [ .body >> .value >> Expect.equal (CanonicalAst.VarLocal "y")
+                                , .def >> Expect.equal
+                                    (CanonicalAst.Def
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 5 }
+                                                { row = 1, col = 6 }
+                                                "y"
+                                        , params = []
+                                        , body =
+                                            SourcePosition.at
+                                                { row = 1, col = 9 }
+                                                { row = 1, col = 10 }
+                                                (CanonicalAst.Int 1)
+                                        }
+                                    )
+                                ]
+                                letOpts
+
+                        _ ->
+                            Expect.fail "Expected Let"
+            , test "LetRec with multiple definitions" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "let a = 1\nb = 2 in a" <| \result ->
+                    when result is
+                        CanonicalAst.LetRec letOpts ->
+                            Expect.all
+                                [ .body >> .value >> Expect.equal (CanonicalAst.VarLocal "a")
+                                , .defs >> Expect.equalArrays
+                                    [ CanonicalAst.Def
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 5 }
+                                                { row = 1, col = 6 }
+                                                "a"
+                                        , params = []
+                                        , body =
+                                            SourcePosition.at
+                                                { row = 1, col = 9 }
+                                                { row = 1, col = 10 }
+                                                (CanonicalAst.Int 1)
+                                        }
+                                    , CanonicalAst.Def
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 2, col = 1 }
+                                                { row = 2, col = 2 }
+                                                "b"
+                                        , params = []
+                                        , body =
+                                            SourcePosition.at
+                                                { row = 2, col = 5 }
+                                                { row = 2, col = 6 }
+                                                (CanonicalAst.Int 2)
+                                        }
+                                    ]
+                                ]
+                                letOpts
+
+                        _ ->
+                            Expect.fail "Expected LetRec"
+            ]
+        , describe "VarLocal"
+            [ test "Variable in scope resolves to VarLocal" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "x"
+                in
+                expectCanonicalize context "x" (CanonicalAst.VarLocal "x")
+            , test "Variable not in scope returns error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeError context "unknownVar" (Canonicalize.UnknownVar "unknownVar")
+            ]
+        , describe "Call expressions"
+            [ test "Simple function call with local variable" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "add"
+                in
+                expectCanonicalizeFlex context "add 1 2" <| \result ->
+                    when result is
+                        CanonicalAst.Call callResult ->
+                            Expect.all
+                                [ .fn >> .value >> Expect.equal (CanonicalAst.VarLocal "add")
+                                , .args >> Array.length >> Expect.equal 2
+                                , .args >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.Int 1))
+                                , .args >> Array.get 1 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.Int 2))
+                                ]
+                                callResult
+
+                        _ ->
+                            Expect.fail "Expected Call"
+            , test "Function call with nested calls" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "f"
+                            |> withScopedLocal "g"
+                in
+                expectCanonicalizeFlex context "f (g 1)" <| \result ->
+                    when result is
+                        CanonicalAst.Call callResult ->
+                            Expect.all
+                                [ .fn >> .value >> Expect.equal (CanonicalAst.VarLocal "f")
+                                , \r ->
+                                    when Array.get 0 callResult.args is
+                                        Just { value = CanonicalAst.Call { fn = innerFn } } ->
+                                            Expect.equal (CanonicalAst.VarLocal "g") innerFn.value
+
+                                        _ ->
+                                            Expect.fail "Expected inner Call"
+                                ]
+                                callResult
+
+                        _ ->
+                            Expect.fail "Expected Call"
+            , test "Function call with imported variable" <| \_ ->
+                let
+                    context =
+                        packageContext PackageName.core "Test"
+                            |> withQualifiedVar PackageName.core "Array" "map"
+                            |> withScopedImported "map" (qualifiedEntry PackageName.core "Array" dummyAnnotation)
+                            |> withScopedLocal "list"
+                            |> withScopedLocal "fn"
+                in
+                expectCanonicalizeFlex context "map fn list" <| \result ->
+                    when result is
+                        CanonicalAst.Call callResult ->
+                            Expect.all
+                                [ .fn >> .value >> Expect.equal (CanonicalAst.VarTopLevel { home = unsafeModuleName "Array", name = "map" })
+                                , .args >> Array.length >> Expect.equal 2
+                                , .args >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just <| CanonicalAst.VarLocal "fn")
+                                , .args >> Array.get 1 >> Maybe.map .value >> Expect.equal (Just <| CanonicalAst.VarLocal "list")
+                                ]
+                                callResult
+
+                        _ ->
+                            Expect.fail "Expected Call"
+            ]
+        , describe "Lambda expressions"
+            [ test "Simple lambda with parameter" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "\\x -> x" <| \result ->
+                    when result is
+                        CanonicalAst.Lambda lambda ->
+                            Expect.all
+                                [ .patterns >> Array.length >> Expect.equal 1
+                                , .patterns >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "x"))
+                                , .expression >> .value >> Expect.equal (CanonicalAst.VarLocal "x")
+                                ]
+                                lambda
+
+                        _ ->
+                            Expect.fail "Expected Lambda"
+            , test "Lambda with multiple parameters" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "\\x y -> x" <| \result ->
+                    when result is
+                        CanonicalAst.Lambda lambda ->
+                            Expect.all
+                                [ .patterns >> Array.length >> Expect.equal 2
+                                , .patterns >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "x"))
+                                , .patterns >> Array.get 1 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "y"))
+                                , .expression >> .value >> Expect.equal (CanonicalAst.VarLocal "x")
+                                ]
+                                lambda
+
+                        _ ->
+                            Expect.fail "Expected Lambda"
+            , test "Lambda with constant body" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "\\x -> 42" <| \result ->
+                    when result is
+                        CanonicalAst.Lambda lambda ->
+                            Expect.all
+                                [ .patterns >> Array.length >> Expect.equal 1
+                                , .patterns >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "x"))
+                                , .expression >> .value >> Expect.equal (CanonicalAst.Int 42)
+                                ]
+                                lambda
+
+                        _ ->
+                            Expect.fail "Expected Lambda"
+            , test "Duplicate parameter names error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeError context "\\x x -> x"
+                    (Canonicalize.DuplicateBinding
+                        { name = "x"
+                        , existingPosition =
+                            { start = { row = 1, col = 2 }
+                            , end = { row = 1, col = 3 }
+                            }
+                        }
+                    )
+            , test "Parameter shadows existing binding error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "x"
+                in
+                expectCanonicalizeError context "\\x -> x"
+                    (Canonicalize.DuplicateBinding
+                        { name = "x"
+                        , existingPosition = dummyRegion
+                        }
+                    )
+            ]
+        , describe "Unqualified vars from imports"
+            [ test "VarTopLevel from same package import" <| \_ ->
+                let
+                    context =
+                        packageContext PackageName.core "Test"
+                            |> withScopedImported "map" (qualifiedEntry PackageName.core "Array" dummyAnnotation)
+                in
+                expectCanonicalize context "map"
+                    (CanonicalAst.VarTopLevel
+                        { home = unsafeModuleName "Array"
+                        , name = "map"
+                        }
+                    )
+            , test "VarForeign from foreign package import" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedImported "func" (qualifiedEntry PackageName.node "External" dummyAnnotation)
+                in
+                expectCanonicalize context "func"
+                    (CanonicalAst.VarForeign
+                        { home = unsafeModuleName "External"
+                        , name = "func"
+                        , annotation = dummyAnnotation
+                        }
+                    )
+            , test "VarDebug from Debug module import" <| \_ ->
+                let
+                    context =
+                        packageContext PackageName.core "Test"
+                            |> withScopedImported "log" (qualifiedEntry PackageName.core "Debug" dummyAnnotation)
+                in
+                expectCanonicalize context "log"
+                    (CanonicalAst.VarDebug
+                        { home = unsafeModuleName "Debug"
+                        , name = "log"
+                        , annotation = dummyAnnotation
+                        }
+                    )
+            , test "DuplicateBinding error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeError context "let x = 1 in let x = 2 in x"
+                    (Canonicalize.DuplicateBinding
+                        { name = "x"
+                        , existingPosition =
+                            { start = { row = 1, col = 5 }
+                            , end = { row = 1, col = 6 }
+                            }
+                        }
+                    )
+            ]
+        ]
+
+
+-- Helpers
+
+
+expectCanonicalize : Canonicalize.Context -> String -> CanonicalAst.Expression_ -> Expectation
+expectCanonicalize context source expected =
+    expectCanonicalizeFlex context source <| \actual ->
+        Expect.equal expected actual
+
+
+expectCanonicalizeFlex : Canonicalize.Context -> String -> (CanonicalAst.Expression_ -> Expectation) -> Expectation
+expectCanonicalizeFlex context source checker =
+    when Parser.run ExpressionParser.parser Context.empty source is
+        Err parseErrs ->
+            Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+
+        Ok parsedExpr ->
+            when Canonicalize.canonicalize context parsedExpr is
+                Ok actual ->
+                    checker actual.value
+
+                Err err ->
+                    Expect.fail ("Canonicalization failed: " ++ Debug.toString err)
+
+
+expectCanonicalizeError : Canonicalize.Context -> String -> Canonicalize.Error -> Expectation
+expectCanonicalizeError context source expectedErr =
+    when Parser.run ExpressionParser.parser Context.empty source is
+        Err parseErrs ->
+            Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
+
+        Ok parsedExpr ->
+            when Canonicalize.canonicalize context parsedExpr is
+                Ok actual ->
+                    Expect.fail "Canonicalization succeeded"
+
+                Err err ->
+                    Expect.equal expectedErr err
+
+
+unsafeModuleName : String -> ModuleName.ModuleName
+unsafeModuleName str =
+    when ModuleName.fromString str is
+        Just mn -> mn
+        Nothing -> Debug.todo "Invalid module name in test"
+
+
+moduleContext : String -> Canonicalize.Context
+moduleContext mod =
+    packageContext PackageName.example mod
+
+
+packageContext : PackageName -> String -> Canonicalize.Context
+packageContext pkg currentModule =
+    { pkg = pkg
+    , currentModule = unsafeModuleName currentModule
+    , qualifiedVars = Dict.empty
+    , qualifiedCtors = Dict.empty
+    , scope = Dict.empty
+    }
+
+
+withQualifiedVar : PackageName -> String -> String -> Canonicalize.Context -> Canonicalize.Context
+withQualifiedVar pkg mod valueName ctx =
+    { ctx | qualifiedVars =
+        Dict.update mod
+            (\maybeMod ->
+                when maybeMod is
+                    Just modValue ->
+                        Just <|
+                            Dict.update valueName
+                                (\maybeValue ->
+                                    when maybeValue is
+                                        Just entry ->
+                                            Just
+                                                { entry | rest = Array.pushLast (qualifiedEntry pkg mod dummyAnnotation) entry.rest }
+
+                                        Nothing ->
+                                            Just { first = qualifiedEntry pkg mod dummyAnnotation, rest = [] }
+                                )
+                                modValue
+
+                    Nothing ->
+                        Just <|
+                            Dict.singleton valueName { first = qualifiedEntry pkg mod dummyAnnotation, rest = [] }
+            )
+            ctx.qualifiedVars
+    }
+
+
+qualifiedEntry : PackageName -> String  -> Annotation -> QualifiedEntry
+qualifiedEntry pkg moduleNameStr annotation =
+    { module_ = unsafeModuleName moduleNameStr
+    , package = pkg
+    , annotation = annotation
+    }
+
+
+dummyAnnotation : Annotation
+dummyAnnotation =
+    { freeVars = Set.empty
+    , tipe = TVar "a"
+    }
+
+
+dummyRegion : SourcePosition.Region
+dummyRegion =
+    { start = SourcePosition.emptyPos, end = SourcePosition.emptyPos }
+
+
+withScopedLocal : String -> Canonicalize.Context -> Canonicalize.Context
+withScopedLocal varName ctx =
+    { ctx | scope =
+        Dict.set varName (Canonicalize.Local { position = dummyRegion }) ctx.scope
+    }
+
+
+withScopedImported : String -> Canonicalize.QualifiedEntry -> Canonicalize.Context -> Canonicalize.Context
+withScopedImported name entry ctx =
+    { ctx | scope =
+        Dict.set name (Canonicalize.Imported { entry = entry, position = dummyRegion }) ctx.scope
+    }

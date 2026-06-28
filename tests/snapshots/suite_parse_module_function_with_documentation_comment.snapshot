@@ -1,0 +1,264 @@
+Ok 
+    (Implementation 
+        { aliases = 
+            [
+            ]
+        , binops = 
+            [
+            ]
+        , docs = Just 
+            { end = 
+                { col = 3
+                , row = 4 
+                }
+            , start = 
+                { col = 1
+                , row = 3 
+                }
+            , value = " Module docs\n" 
+            }
+        , effects = NoEffects
+        , exports = Open
+        , imports = 
+            [
+            ]
+        , name = 
+            { end = 
+                { col = 16
+                , row = 1 
+                }
+            , start = 
+                { col = 8
+                , row = 1 
+                }
+            , value = "MyModule" 
+            }
+        , requires = 
+            [
+            ]
+        , unions = 
+            [
+            ]
+        , values = 
+            [
+                { end = 
+                    { col = 10
+                    , row = 10 
+                    }
+                , start = 
+                    { col = 1
+                    , row = 8 
+                    }
+                , value = 
+                    { docs = Just 
+                        { end = 
+                            { col = 3
+                            , row = 7 
+                            }
+                        , start = 
+                            { col = 1
+                            , row = 6 
+                            }
+                        , value = " This function adds two numbers together\n" 
+                        }
+                    , value = 
+                        { args = 
+                            [
+                                { end = 
+                                    { col = 6
+                                    , row = 9 
+                                    }
+                                , start = 
+                                    { col = 5
+                                    , row = 9 
+                                    }
+                                , value = PVar "x" 
+                                }
+                            , 
+                                { end = 
+                                    { col = 8
+                                    , row = 9 
+                                    }
+                                , start = 
+                                    { col = 7
+                                    , row = 9 
+                                    }
+                                , value = PVar "y" 
+                                }
+                            ]
+                        , body = 
+                            { end = 
+                                { col = 10
+                                , row = 10 
+                                }
+                            , start = 
+                                { col = 5
+                                , row = 10 
+                                }
+                            , value = Binops 
+                                { left = 
+                                    { end = 
+                                        { col = 6
+                                        , row = 10 
+                                        }
+                                    , start = 
+                                        { col = 5
+                                        , row = 10 
+                                        }
+                                    , value = Var 
+                                        { name = "x"
+                                        , varType = LowVar 
+                                        } 
+                                    }
+                                , operator = 
+                                    { end = 
+                                        { col = 8
+                                        , row = 10 
+                                        }
+                                    , start = 
+                                        { col = 7
+                                        , row = 10 
+                                        }
+                                    , value = "+" 
+                                    }
+                                , right = 
+                                    { end = 
+                                        { col = 10
+                                        , row = 10 
+                                        }
+                                    , start = 
+                                        { col = 9
+                                        , row = 10 
+                                        }
+                                    , value = Var 
+                                        { name = "y"
+                                        , varType = LowVar 
+                                        } 
+                                    } 
+                                } 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 4
+                                , row = 9 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 9 
+                                }
+                            , value = "add" 
+                            }
+                        , signature = Just 
+                            { start = 
+                                { col = 1
+                                , row = 8 
+                                }
+                            , type_ = 
+                                { end = 
+                                    { col = 24
+                                    , row = 8 
+                                    }
+                                , start = 
+                                    { col = 7
+                                    , row = 8 
+                                    }
+                                , value = TLambda 
+                                    { from = 
+                                        { end = 
+                                            { col = 10
+                                            , row = 8 
+                                            }
+                                        , start = 
+                                            { col = 7
+                                            , row = 8 
+                                            }
+                                        , value = TType 
+                                            { args = 
+                                                [
+                                                ]
+                                            , name = 
+                                                { end = 
+                                                    { col = 10
+                                                    , row = 8 
+                                                    }
+                                                , start = 
+                                                    { col = 7
+                                                    , row = 8 
+                                                    }
+                                                , value = "Int" 
+                                                } 
+                                            } 
+                                        }
+                                    , to = 
+                                        { end = 
+                                            { col = 24
+                                            , row = 8 
+                                            }
+                                        , start = 
+                                            { col = 14
+                                            , row = 8 
+                                            }
+                                        , value = TLambda 
+                                            { from = 
+                                                { end = 
+                                                    { col = 17
+                                                    , row = 8 
+                                                    }
+                                                , start = 
+                                                    { col = 14
+                                                    , row = 8 
+                                                    }
+                                                , value = TType 
+                                                    { args = 
+                                                        [
+                                                        ]
+                                                    , name = 
+                                                        { end = 
+                                                            { col = 17
+                                                            , row = 8 
+                                                            }
+                                                        , start = 
+                                                            { col = 14
+                                                            , row = 8 
+                                                            }
+                                                        , value = "Int" 
+                                                        } 
+                                                    } 
+                                                }
+                                            , to = 
+                                                { end = 
+                                                    { col = 24
+                                                    , row = 8 
+                                                    }
+                                                , start = 
+                                                    { col = 21
+                                                    , row = 8 
+                                                    }
+                                                , value = TType 
+                                                    { args = 
+                                                        [
+                                                        ]
+                                                    , name = 
+                                                        { end = 
+                                                            { col = 24
+                                                            , row = 8 
+                                                            }
+                                                        , start = 
+                                                            { col = 21
+                                                            , row = 8 
+                                                            }
+                                                        , value = "Int" 
+                                                        } 
+                                                    } 
+                                                } 
+                                            } 
+                                        } 
+                                    } 
+                                } 
+                            } 
+                        } 
+                    } 
+                }
+            ] 
+        }
+    )

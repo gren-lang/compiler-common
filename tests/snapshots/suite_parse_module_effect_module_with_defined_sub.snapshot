@@ -1,0 +1,48 @@
+Ok 
+    (Implementation 
+        { aliases = 
+            [
+            ]
+        , binops = 
+            [
+            ]
+        , docs = Nothing
+        , effects = Manager 
+            (Sub 
+                { end = 
+                    { col = 53
+                    , row = 1 
+                    }
+                , start = 
+                    { col = 48
+                    , row = 1 
+                    }
+                , value = "MySub" 
+                }
+            )
+        , exports = Open
+        , imports = 
+            [
+            ]
+        , name = 
+            { end = 
+                { col = 24
+                , row = 1 
+                }
+            , start = 
+                { col = 15
+                , row = 1 
+                }
+            , value = "SubModule" 
+            }
+        , requires = 
+            [
+            ]
+        , unions = 
+            [
+            ]
+        , values = 
+            [
+            ] 
+        }
+    )

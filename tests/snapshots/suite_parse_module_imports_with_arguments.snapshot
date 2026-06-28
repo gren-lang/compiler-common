@@ -1,0 +1,105 @@
+Ok 
+    (Implementation 
+        { aliases = 
+            [
+            ]
+        , binops = 
+            [
+            ]
+        , docs = Nothing
+        , effects = NoEffects
+        , exports = Open
+        , imports = 
+            [
+                { end = 
+                    { col = 14
+                    , row = 3 
+                    }
+                , start = 
+                    { col = 1
+                    , row = 3 
+                    }
+                , value = 
+                    { alias = Nothing
+                    , args = 
+                        [
+                        ]
+                    , expose = Explicit 
+                        [
+                        ]
+                    , module_ = 
+                        { end = 
+                            { col = 14
+                            , row = 3 
+                            }
+                        , start = 
+                            { col = 8
+                            , row = 3 
+                            }
+                        , value = "String" 
+                        } 
+                    } 
+                }
+            , 
+                { end = 
+                    { col = 30
+                    , row = 4 
+                    }
+                , start = 
+                    { col = 1
+                    , row = 4 
+                    }
+                , value = 
+                    { alias = Just "StrDict"
+                    , args = 
+                        [
+                            { end = 
+                                { col = 19
+                                , row = 4 
+                                }
+                            , start = 
+                                { col = 13
+                                , row = 4 
+                                }
+                            , value = "String" 
+                            }
+                        ]
+                    , expose = Explicit 
+                        [
+                        ]
+                    , module_ = 
+                        { end = 
+                            { col = 12
+                            , row = 4 
+                            }
+                        , start = 
+                            { col = 8
+                            , row = 4 
+                            }
+                        , value = "Dict" 
+                        } 
+                    } 
+                }
+            ]
+        , name = 
+            { end = 
+                { col = 16
+                , row = 1 
+                }
+            , start = 
+                { col = 8
+                , row = 1 
+                }
+            , value = "MyModule" 
+            }
+        , requires = 
+            [
+            ]
+        , unions = 
+            [
+            ]
+        , values = 
+            [
+            ] 
+        }
+    )

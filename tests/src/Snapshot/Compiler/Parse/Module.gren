@@ -1,0 +1,192 @@
+module Snapshot.Compiler.Parse.Module exposing ( tests )
+
+import Snapshot exposing (test)
+import String.Parser.Advanced as Parser
+import Compiler.Parse.Module as PM
+import Compiler.Parse.Number as Number
+import Compiler.SourcePosition as SourcePosition
+import Compiler.Ast.Source as AST
+import Compiler.Parse.Context as Context
+
+
+tests : Snapshot.Test
+tests =
+    Snapshot.describe "Parse.Module"
+        [ test "Empty module" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+                """
+                |> Snapshot.this
+        , test "Empty module with exposings (valid when parsing)" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing ( Model, Msg (..), (==), view )
+                """
+                |> Snapshot.this
+        , test "the port keyword is optional (going away in future release)" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                port module PortModule exposing (..)
+                """
+                |> Snapshot.this
+        , test "effect module with defined cmd" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                effect module CmdModule where { command = MyCmd } exposing (..)
+                """
+                |> Snapshot.this
+        , test "effect module with defined sub" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                effect module SubModule where { subscription = MySub } exposing (..)
+                """
+                |> Snapshot.this
+        , test "effect module with defined fx" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                effect module FxModule where { command = MyCmd, subscription = MySub } exposing (..)
+                """
+                |> Snapshot.this
+        , test "Docs" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                {-| The documentation for MyModule
+                -}
+                """
+                |> Snapshot.this
+        , test "imports" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array
+                """
+                |> Snapshot.this
+        , test "imports with alias" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array as A
+                """
+                |> Snapshot.this
+        , test "imports with alias and exposing" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array exposing (..)
+                import Nested.Module as N.M exposing (T)
+                """
+            |> Snapshot.this
+        , test "imports end positions" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array
+  
+                import Basics exposing
+                    (max)
+                """
+            |> Snapshot.this
+        , test "requires with alias and exposing" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                require Compare
+                require String.Compare as StrC
+                require Package exposing (..)
+
+                import Array exposing (..)
+                import Nested.Module as N.M exposing (T)
+                """
+            |> Snapshot.this
+        , test "imports with arguments" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import String
+                import Dict String as StrDict
+                """
+                |> Snapshot.this
+        , test "operators" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                infix left  0 (|>) = apR
+                infix right 3 (&&) = and
+                infix non   4 (==) = eq
+                """
+                |> Snapshot.this
+         , test "Module with values, type aliases, unions, and ports" <| \_ ->
+             Parser.run PM.parser Context.empty
+                 """
+                 module MyValues exposing (..)
+
+                 num : Int
+                 num = 25
+
+                 type alias Person =
+                   { name : String
+                   , age : Int
+                   }
+
+                 type Choice
+                   = Left
+                   | Right
+
+                 port somePort : String -> Cmd msg
+                 """
+                 |> Snapshot.this
+         , test "Declaration after when expression" <| \_ ->
+             Parser.run PM.parser Context.empty
+                 """
+                 module Test exposing (..)
+
+                 foo : Int -> String
+                 foo n =
+                     when n is
+                         0 -> "Zero"
+                         1 -> "One"
+                         _ -> "Other"
+
+                 bar : Int -> String
+                 bar n =
+                     String.fromInt n
+                 """
+                 |> Snapshot.this
+        , test "Function with documentation comment" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                {-| Module docs
+                -}
+
+                {-| This function adds two numbers together
+                -}
+                add : Int -> Int -> Int
+                add x y =
+                    x + y
+                """
+                |> Snapshot.this
+         , test "Signature module" <| \_ ->
+             Parser.run PM.parser Context.empty
+                 """
+                 signature module Comparable
+
+                 import Basics
+
+                 type T
+
+                 compare : T -> T -> Basics.Order
+                 """
+                 |> Snapshot.this
+        ]

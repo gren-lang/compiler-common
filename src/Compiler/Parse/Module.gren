@@ -16,6 +16,7 @@ import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Ast.Source as AST
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Space as Space
+import Compiler.Parse.Type as Type
 import Compiler.Parse.Variable as Variable
 import Compiler.Parse.Operator as Operator
 import Compiler.Parse.Declaration as Declaration
@@ -33,6 +34,7 @@ type Error
     | OperatorError Operator.Error
     | ExpectedIntPrecedence
     | DeclarationError Declaration.Error
+    | TypeError Type.Error
     | SpaceError Space.Error
     | ExpectedEnd
 
@@ -66,6 +68,9 @@ errorToString error =
         ExpectedEnd ->
             "Expected end of file"
 
+        TypeError typeError ->
+            Type.errorToString typeError
+
 
 spaceParser : Parser Context Error {}
 spaceParser =
@@ -78,8 +83,49 @@ spaceParser =
 -}
 parser : Parser Context Error AST.Module
 parser =
+    -- TODO: post parse verification. Check Haskell-based compiler for details
+    Parser.oneOf
+        [ parseSignatureModule
+        , parseImplementationModule
+        ]
+
+
+parseSignatureModule : Parser Context Error AST.Module
+parseSignatureModule =
     Parser.succeed
-        (\{ name, effects } exports docs imports binops decls ->
+        (\name docs imports sigs ->
+            let
+                values =
+                    Array.mapAndKeepJust parsedSignatureToModuleValueSignature sigs
+
+                types =
+                    Array.mapAndKeepJust parsedSignatureToModuleTypeSignature sigs
+            in
+            AST.Signature
+                { name = name
+                , docs = docs
+                , imports = imports
+                , values = values
+                , types = types
+                }
+        )
+        |> Parser.skip (Parser.token "signature" (ExpectedKeyword "signature"))
+        |> Parser.skip spaceParser
+        |> Parser.skip (Parser.token "module" (ExpectedKeyword "module"))
+        |> Parser.skip spaceParser
+        |> Parser.keep moduleNameParser
+        |> Parser.skip spaceParser
+        |> Parser.keep (Declaration.docParser ExpectedKeyword)
+        |> Parser.skip spaceParser
+        |> Parser.keep (Parser.loop [] importLoopParser)
+        |> Parser.skip spaceParser
+        |> Parser.keep (Parser.loop [] signatureLoopParser)
+
+
+parseImplementationModule : Parser Context Error AST.Module
+parseImplementationModule =
+    Parser.succeed
+        (\{ name, effects } exports docs requires imports binops decls ->
             let
                 values =
                     Array.mapAndKeepJust declarationToModuleValue decls
@@ -93,25 +139,27 @@ parser =
                 ports =
                     Array.mapAndKeepJust declarationToModulePort decls
             in
-            { name = name
-            , exports = exports
-            , docs = docs
-            , imports = imports
-            , values = values
-            , unions = unions
-            , aliases = aliases
-            , binops = binops
-            , effects =
-                when ports is
-                    [] ->
-                        -- TODO: support both ports and effects
-                        -- currently, only kernel devs can define effects
-                        -- so don't worry about it for now
-                        effects
+            AST.Implementation
+                { name = name
+                , exports = exports
+                , docs = docs
+                , requires = requires
+                , imports = imports
+                , values = values
+                , unions = unions
+                , aliases = aliases
+                , binops = binops
+                , effects =
+                    when ports is
+                        [] ->
+                            -- TODO: support both ports and effects
+                            -- currently, only kernel devs can define effects
+                            -- so don't worry about it for now
+                            effects
 
-                    _ ->
-                        AST.Ports ports
-            }
+                        _ ->
+                            AST.Ports ports
+                }
         )
         |> Parser.keep
             (Parser.oneOf
@@ -141,6 +189,8 @@ parser =
         |> Parser.keep parseExposingStatement
         |> Parser.skip spaceParser
         |> Parser.keep (Declaration.docParser ExpectedKeyword)
+        |> Parser.skip spaceParser
+        |> Parser.keep (Parser.loop [] requireLoopParser)
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] importLoopParser)
         |> Parser.skip spaceParser
@@ -355,10 +405,10 @@ parseOperatorDeclaration =
         |> Parser.keep Parser.getPosition
 
 
-importLoopParser
-    : Array (SourcePosition.Located AST.Import)
-    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located  AST.Import)) (Array (SourcePosition.Located  AST.Import)))
-importLoopParser imps =
+requireLoopParser
+    : Array (SourcePosition.Located AST.Require)
+    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located AST.Require)) (Array (SourcePosition.Located AST.Require)))
+requireLoopParser imps =
     Parser.oneOf
         [ Parser.succeed
             (\moduleName ->
@@ -370,7 +420,7 @@ importLoopParser imps =
                     , expose = AST.Explicit []
                     }
             )
-            |> Parser.skip (Parser.token "import" (ExpectedKeyword "import"))
+            |> Parser.skip (Parser.token "require "(ExpectedKeyword "require"))
             |> Parser.skip spaceParser
             |> Parser.keep moduleNameParser
             |> Parser.skip spaceParser
@@ -428,6 +478,105 @@ importLoopParser imps =
                 )
         , Parser.succeed (Parser.Done imps)
         ]
+
+
+importLoopParser
+    : Array (SourcePosition.Located AST.Import)
+    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located AST.Import)) (Array (SourcePosition.Located AST.Import)))
+importLoopParser imps =
+    Parser.oneOf
+        [ Parser.succeed
+            (\moduleName args ->
+                SourcePosition.at
+                    { moduleName.start | col = 1 }
+                    ( Array.last args
+                        |> Maybe.map .end
+                        |> Maybe.withDefault moduleName.end
+                    )
+                    { module_ = moduleName
+                    , args = args
+                    , alias = Nothing
+                    , expose = AST.Explicit []
+                    }
+            )
+            |> Parser.skip (Parser.token "import "(ExpectedKeyword "import"))
+            |> Parser.skip spaceParser
+            |> Parser.keep moduleNameParser
+            |> Parser.skip spaceParser
+            |> Parser.keep (Parser.loop [] parseImportArgLoop)
+            |> Parser.andThen
+                (\baseImport ->
+                    if Array.isEmpty baseImport.value.args then
+                        Parser.oneOf
+                            [ parseImportAlias baseImport
+                            , Parser.succeed baseImport
+                            ]
+                    else
+                        -- Import has arguments, so alias is required
+                        parseImportAlias baseImport
+                )
+            |> Parser.andThen
+                (\importWithAlias ->
+                    Parser.succeed
+                        (\expose endPos ->
+                            { importWithAlias
+                                | end =
+                                    -- implicitly check if we actually found an exposing list
+                                    if expose == AST.Explicit [] then
+                                        importWithAlias.end
+
+                                    else
+                                        endPos
+                                , value =
+                                    { importWithAlias.value
+                                        | expose = expose
+                                    }
+                            }
+                        )
+                        |> Parser.keep
+                            (Parser.oneOf
+                                [ parseExposingStatement
+                                , Parser.succeed (AST.Explicit [])
+                                ]
+                            )
+                        |> Parser.keep Parser.getPosition
+                        |> Parser.skip spaceParser
+                )
+            |> Parser.map
+                (\finalImport ->
+                    Parser.Loop <|
+                        Array.pushLast finalImport imps
+                )
+        , Parser.succeed (Parser.Done imps)
+        ]
+
+
+parseImportArgLoop : Array (SourcePosition.Located String) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located String)) (Array (SourcePosition.Located String)))
+parseImportArgLoop args =
+    Parser.oneOf
+        [ Parser.succeed (\next -> Parser.Loop <| Array.pushLast next args)
+            |> Parser.keep moduleNameParser
+            |> Parser.skip spaceParser
+        , Parser.succeed (Parser.Done args)
+        ]
+
+
+parseImportAlias : SourcePosition.Located AST.Import -> Parser Context Error (SourcePosition.Located AST.Import)
+parseImportAlias baseImport =
+    Parser.succeed
+        (\alias ->
+            { baseImport
+                | end = alias.end
+                , value =
+                    { baseImport.value
+                        | alias = Just alias.value
+                    }
+            }
+        )
+        |> Parser.skip (Parser.token "as" (ExpectedKeyword "as"))
+        |> Parser.skip spaceParser
+        |> Parser.keep moduleNameParser
+        |> Parser.skip spaceParser
 
 
 operatorLoopParser
@@ -536,6 +685,79 @@ declarationToModulePort decl =
                     v.signature.end
                     { docs = decl.docs
                     , value = v
+                    }
+
+        _ ->
+            Nothing
+
+
+type ParsedSignature
+    = ValueSignature { doc : Maybe (SourcePosition.Located String), value : AST.ValueSignature }
+    | TypeSignature { doc : Maybe (SourcePosition.Located String), value : AST.TypeSignature }
+
+
+signatureLoopParser
+    : Array ParsedSignature
+    -> Parser Context Error (Parser.Step (Array ParsedSignature) (Array ParsedSignature))
+signatureLoopParser decls =
+    Parser.oneOf
+        [ Parser.succeed
+            (\doc tipe ->
+                Parser.Loop <|
+                    Array.pushLast (TypeSignature { doc = doc, value = { name = tipe } }) decls
+            )
+            |> Parser.keep (Declaration.docParser ExpectedKeyword)
+            |> Parser.skip spaceParser
+            |> Parser.skip (Parser.token "type" (ExpectedKeyword "type"))
+            |> Parser.skip spaceParser
+            |> Parser.keep ctorNameParser
+            |> Parser.skip spaceParser
+        , Parser.succeed
+            (\doc name tipe ->
+                Parser.Loop <|
+                    Array.pushLast (ValueSignature { doc = doc, value = { name = name, signature = tipe } }) decls
+            )
+            |> Parser.keep (Declaration.docParser ExpectedKeyword)
+            |> Parser.skip spaceParser
+            |> Parser.keep
+                (SourcePosition.parser Variable.lowerCase
+                    |> Parser.mapError VariableError
+                )
+            |> Parser.skip spaceParser
+            |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
+            |> Parser.skip spaceParser
+            |> Parser.keep (Parser.mapError TypeError Type.parser)
+        , Parser.succeed (Parser.Done decls)
+            |> Parser.skip (Parser.end ExpectedEnd)
+        ]
+
+
+parsedSignatureToModuleValueSignature : ParsedSignature -> Maybe (AST.ModuleDeclaration AST.ValueSignature)
+parsedSignatureToModuleValueSignature sig =
+    when sig is
+        ValueSignature { doc, value } ->
+            Just <|
+                SourcePosition.at
+                    value.name.start
+                    value.signature.end
+                    { docs = doc
+                    , value = value
+                    }
+
+        _ ->
+            Nothing
+
+
+parsedSignatureToModuleTypeSignature : ParsedSignature -> Maybe (AST.ModuleDeclaration AST.TypeSignature)
+parsedSignatureToModuleTypeSignature sig =
+    when sig is
+        TypeSignature { doc, value } ->
+            Just <|
+                SourcePosition.at
+                    value.name.start
+                    value.name.end
+                    { docs = doc
+                    , value = value
                     }
 
         _ ->

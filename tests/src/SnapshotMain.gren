@@ -1,0 +1,24 @@
+module SnapshotMain exposing (..)
+
+import Node
+import Init
+import Expect
+import FileSystem
+import FileSystem.Path as Path
+import Test.Runner.Effectful as Effectful exposing (run, describe, test, await)
+import Snapshot
+import Snapshot.Compiler.Parse.Module
+
+
+main : Effectful.Program a
+main =
+    Node.defineSimpleProgram <| \env ->
+        Init.await FileSystem.initialize <| \fsPerm->
+            run env <|
+                Snapshot.suite
+                    { filesystemPermission = fsPerm
+                    , folder = Path.fromPosixString "./snapshots"
+                    , record = False
+                    }
+                    [ Snapshot.Compiler.Parse.Module.tests
+                    ]

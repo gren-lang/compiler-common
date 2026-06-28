@@ -1,0 +1,61 @@
+Ok 
+    (Implementation 
+        { aliases = 
+            [
+            ]
+        , binops = 
+            [
+            ]
+        , docs = Nothing
+        , effects = Manager 
+            (Fx 
+                { cmd = 
+                    { end = 
+                        { col = 47
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 42
+                        , row = 1 
+                        }
+                    , value = "MyCmd" 
+                    }
+                , sub = 
+                    { end = 
+                        { col = 69
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 64
+                        , row = 1 
+                        }
+                    , value = "MySub" 
+                    } 
+                }
+            )
+        , exports = Open
+        , imports = 
+            [
+            ]
+        , name = 
+            { end = 
+                { col = 23
+                , row = 1 
+                }
+            , start = 
+                { col = 15
+                , row = 1 
+                }
+            , value = "FxModule" 
+            }
+        , requires = 
+            [
+            ]
+        , unions = 
+            [
+            ]
+        , values = 
+            [
+            ] 
+        }
+    )
