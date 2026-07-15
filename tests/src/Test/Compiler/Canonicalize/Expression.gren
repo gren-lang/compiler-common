@@ -487,8 +487,8 @@ packageContext pkg currentModule =
     { pkg = pkg
     , currentModule = unsafeModuleName currentModule
     , qualifiedVars = Dict.empty
-    , qualifiedCtors = Dict.empty
     , scope = Dict.empty
+    , scopedCtors = Dict.empty
     }
 
 

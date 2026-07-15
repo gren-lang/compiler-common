@@ -613,8 +613,8 @@ packageContext pkg currentModule =
     { pkg = pkg
     , currentModule = unsafeModuleName currentModule
     , qualifiedVars = Dict.empty
-    , qualifiedCtors = Dict.empty
     , scope = Dict.empty
+    , scopedCtors = Dict.empty
     }
 
 
@@ -652,12 +652,14 @@ qualifiedEntry pkg moduleNameStr annotation =
     }
 
 
-qualifiedCtor : PackageName -> String -> String -> CanonicalAst.Union -> Canonicalize.QualifiedCtor
-qualifiedCtor pkg moduleNameStr unionName union =
+qualifiedCtor : PackageName -> String -> String -> CanonicalAst.Union -> Int -> String -> Canonicalize.QualifiedCtor
+qualifiedCtor pkg moduleNameStr unionName union ctorIdx ctorName =
     { module_ = unsafeModuleName moduleNameStr
     , package = pkg
     , unionName = unionName
     , union = union
+    , index = ctorIdx
+    , name = ctorName
     }
 
 
@@ -702,45 +704,29 @@ withQualifiedCtors pkg mod unionName ctors startingCtx =
         union =
             unionFromCtors ctors
     in
-    Array.foldl
-        (\ctor ctx ->
-            { ctx | qualifiedCtors =
+    Array.indexedFoldl
+        (\idx ctor ctx ->
+            { ctx | scopedCtors =
                 Dict.update
-                    mod
-                    (\maybeMod ->
-                        when maybeMod is
-                            Just modValue ->
-                                Just <|
-                                    Dict.update
-                                        ctor.name
-                                        (\maybeValue ->
-                                            when maybeValue is
-                                                Just entry ->
-                                                    Just
-                                                        { entry
-                                                            | rest =
-                                                                Array.pushLast
-                                                                    (qualifiedCtor pkg mod unionName union)
-                                                                    entry.rest
-                                                            }
-
-                                                Nothing ->
-                                                    Just
-                                                        { first = qualifiedCtor pkg mod unionName union
-                                                        , rest = []
-                                                        }
-                                        )
-                                        modValue
+                    ctor.name
+                    (\maybeValue ->
+                        when maybeValue is
+                            Just entry ->
+                                Just
+                                    { entry
+                                        | rest =
+                                            Array.pushLast
+                                                (qualifiedCtor pkg mod unionName union idx ctor.name)
+                                                entry.rest
+                                        }
 
                             Nothing ->
-                                Just <|
-                                    Dict.singleton
-                                        ctor.name
-                                        { first = qualifiedCtor pkg mod unionName union
-                                        , rest = []
-                                        }
+                                Just
+                                    { first = qualifiedCtor pkg mod unionName union idx ctor.name
+                                    , rest = []
+                                    }
                     )
-                    ctx.qualifiedCtors
+                    ctx.scopedCtors
             }
         )
         startingCtx

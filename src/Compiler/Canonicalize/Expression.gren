@@ -35,13 +35,6 @@ type Error
     | DuplicateBinding { name : String, existingPosition : SourcePosition.Region }
 
 
-{-| Entry in the scope dictionary, representing how an unqualified name resolves.
--}
-type ScopeEntry
-    = Local { position : SourcePosition.Region }
-    | Imported { entry : QualifiedEntry, position : SourcePosition.Region }
-
-
 {-| Context for canonicalization:
 -}
 type alias Context =
@@ -49,11 +42,14 @@ type alias Context =
     , currentModule : ModuleName
     -- Dict <qualifier> (Dict <name> entry)
     , qualifiedVars : Dict String (Dict String (OneOrMore QualifiedEntry))
-    , qualifiedCtors : Dict String (Dict String (OneOrMore QualifiedCtor))
+    -- Dict <possible qualified ref> ctor
     , scope : Dict String ScopeEntry
+    , scopedCtors : Dict String (OneOrMore QualifiedCtor)
     }
 
 
+{-| Non-empty array
+-}
 type alias OneOrMore a =
     { first : a
     , rest : Array a
@@ -76,7 +72,16 @@ type alias QualifiedCtor =
      , package : PackageName
      , unionName : String
      , union : CanonicalAst.Union
+     , name : String
+     , index : Int
      }
+
+
+{-| Entry in the scope dictionary, representing how an unqualified name resolves.
+-}
+type ScopeEntry
+    = Local { position : SourcePosition.Region }
+    | Imported { entry : QualifiedEntry, position : SourcePosition.Region }
 
 
 {-| Canonicalize a single expression.
@@ -397,12 +402,30 @@ canonicalizePattern context pat =
                 (canonicalizePattern context pattern)
 
         ParseAst.PCtor opts ->
-            when Dict.get opts.name.value context.qualifiedCtors is
+            when Dict.get opts.name.value context.scopedCtors is
                 Nothing ->
                     Err (UnknownCtor opts.name.value)
 
-                Just _ ->
-                    Err PlaceholderError  -- TODO: implement constructor pattern resolution
+                Just { first = ctor, rest = [] } ->
+                    CanonicalAst.PCtor
+                        { arg = Nothing -- TODO
+                        , home = ctor.module_
+                        , index = ctor.index
+                        , name = ctor.name
+                        , tipe = ctor.unionName -- TODO
+                        , union = ctor.union
+                        }
+                    |> SourcePosition.at pat.start pat.end
+                    |> Ok
+
+                -- more than one hit
+                Just { first, rest } ->
+                    let
+                        mods =
+                            Array.pushFirst first rest
+                                |> Array.map (\e -> { package = e.package, module_ = e.module_ })
+                    in
+                    Err (AmbiguousVar { name = opts.name.value, modules = mods })
 
         ParseAst.PCtorQual _ ->
             Err PlaceholderError  -- TODO: implement qualified constructor pattern resolution
