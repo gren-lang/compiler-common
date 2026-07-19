@@ -303,6 +303,65 @@ tests =
 
                         _ ->
                             Expect.fail "Expected PCtor"
+            , test "Unqualified, with arg" <| \_ ->
+                let
+                    myTypeCtors =
+                        [ { name = "MyCtor"
+                          , index = 0
+                          , arg = Just otherTypeType
+                          }
+                        ]
+
+                    otherTypeType =
+                      CanonicalAst.TType
+                        { home = unsafeModuleName "OtherType"
+                        , name = "OtherType"
+                        , vars = []
+                        }
+
+                    otherTypeCtors =
+                        [ { name = "First"
+                          , index = 0
+                          , arg = Nothing
+                          }
+                        ]
+                
+                    context =
+                        rootContext
+                            |> withQualifiedCtors PackageName.example "MyType" "MyType" myTypeCtors
+                            |> withQualifiedCtors PackageName.example "OtherType" "OtherType" otherTypeCtors
+                in
+                expectCanonicalizePatternFlex context "MyCtor First" <| \result ->
+                    when result is
+                        CanonicalAst.PCtor ctor ->
+                            Expect.equal
+                              { home = unsafeModuleName "MyType"
+                              , tipe = "MyType"
+                              , union = unionFromCtors myTypeCtors
+                              , name = "MyCtor"
+                              , index = 0
+                              , arg =
+                                Just <|
+                                    { tipe = otherTypeType
+                                    , arg =
+                                        SourcePosition.at
+                                            { row = 1, col = 8 }
+                                            { row = 1, col = 13 }
+                                            (CanonicalAst.PCtor
+                                                { home = unsafeModuleName "OtherType"
+                                                , tipe = "OtherType"
+                                                , union = unionFromCtors otherTypeCtors
+                                                , name = "First"
+                                                , index = 0
+                                                , arg = Nothing
+                                                }
+                                            )
+                                    }
+                              }
+                              ctor
+
+                        _ ->
+                            Expect.fail "Expected PCtor"
             ]
         , describe "Combined Patterns" <|
             let
@@ -593,9 +652,6 @@ tests =
             [ test "Unknown Ctor returns relevant error" <| \_ ->
                 expectCanonicalizePatternError context "Just x"
                     (Canonicalize.UnknownCtor "Just")
-            , test "Qualified constructor pattern not yet implemented" <| \_ ->
-                expectCanonicalizePatternError context "Maybe.Just x"
-                    Canonicalize.PlaceholderError
             ]
         ]
 
@@ -652,14 +708,15 @@ qualifiedEntry pkg moduleNameStr annotation =
     }
 
 
-qualifiedCtor : PackageName -> String -> String -> CanonicalAst.Union -> Int -> String -> Canonicalize.QualifiedCtor
-qualifiedCtor pkg moduleNameStr unionName union ctorIdx ctorName =
+qualifiedCtor : PackageName -> String -> String -> CanonicalAst.Union -> Int -> String -> Maybe CanonicalAst.Type -> Canonicalize.QualifiedCtor
+qualifiedCtor pkg moduleNameStr unionName union ctorIdx ctorName argType =
     { module_ = unsafeModuleName moduleNameStr
     , package = pkg
     , unionName = unionName
     , union = union
     , index = ctorIdx
     , name = ctorName
+    , argType = argType
     }
 
 
@@ -716,13 +773,13 @@ withQualifiedCtors pkg mod unionName ctors startingCtx =
                                     { entry
                                         | rest =
                                             Array.pushLast
-                                                (qualifiedCtor pkg mod unionName union idx ctor.name)
+                                                (qualifiedCtor pkg mod unionName union idx ctor.name ctor.arg)
                                                 entry.rest
                                         }
 
                             Nothing ->
                                 Just
-                                    { first = qualifiedCtor pkg mod unionName union idx ctor.name
+                                    { first = qualifiedCtor pkg mod unionName union idx ctor.name ctor.arg
                                     , rest = []
                                     }
                     )
@@ -754,7 +811,7 @@ unionFromCtors ctors =
 
 expectCanonicalizePattern : Canonicalize.Context -> String -> CanonicalAst.Pattern_ -> Expectation
 expectCanonicalizePattern context source expected =
-    when Parser.run PatternParser.parser Context.empty source is
+    when Parser.run PatternParser.topLevelParser Context.empty source is
         Err parseErrs ->
             Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
         Ok parsedPattern ->
@@ -767,7 +824,7 @@ expectCanonicalizePattern context source expected =
 
 expectCanonicalizePatternFlex : Canonicalize.Context -> String -> (CanonicalAst.Pattern_ -> Expectation) -> Expectation
 expectCanonicalizePatternFlex context source checker =
-    when Parser.run PatternParser.parser Context.empty source is
+    when Parser.run PatternParser.topLevelParser Context.empty source is
         Err parseErrs ->
             Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
         Ok parsedPattern ->
@@ -780,7 +837,7 @@ expectCanonicalizePatternFlex context source checker =
 
 expectCanonicalizePatternError : Canonicalize.Context -> String -> Canonicalize.Error -> Expectation
 expectCanonicalizePatternError context source expectedErr =
-    when Parser.run PatternParser.parser Context.empty source is
+    when Parser.run PatternParser.topLevelParser Context.empty source is
         Err parseErrs ->
             Expect.fail ("Parse error: " ++ Debug.toString parseErrs)
         Ok parsedPattern ->

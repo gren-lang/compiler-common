@@ -30,6 +30,8 @@ type Error
     | ModuleNotFound String
     | UnknownVar String
     | UnknownCtor String
+    | CtorRequiresArg CanonicalAst.Type
+    | CtorTakesNoArg
     | AmbiguousVar { name : String, modules : Array { package : PackageName, module_ : ModuleName } }
     | NotExposed { mod : String, name : String }
     | DuplicateBinding { name : String, existingPosition : SourcePosition.Region }
@@ -74,6 +76,7 @@ type alias QualifiedCtor =
      , union : CanonicalAst.Union
      , name : String
      , index : Int
+     , argType : Maybe CanonicalAst.Type
      }
 
 
@@ -407,16 +410,43 @@ canonicalizePattern context pat =
                     Err (UnknownCtor opts.name.value)
 
                 Just { first = ctor, rest = [] } ->
-                    CanonicalAst.PCtor
-                        { arg = Nothing -- TODO
-                        , home = ctor.module_
-                        , index = ctor.index
-                        , name = ctor.name
-                        , tipe = ctor.unionName -- TODO
-                        , union = ctor.union
-                        }
-                    |> SourcePosition.at pat.start pat.end
-                    |> Ok
+                    let
+                        rootCtorOpts =
+                            { arg = Nothing
+                            , home = ctor.module_
+                            , index = ctor.index
+                            , name = ctor.name
+                            , tipe = ctor.unionName -- TODO
+                            , union = ctor.union
+                            }
+                    in
+                    when { parsedArg = opts.arg, definedArgType = ctor.argType } is
+                        { parsedArg = Nothing, definedArgType = Nothing } ->
+                            CanonicalAst.PCtor rootCtorOpts
+                                |> SourcePosition.at pat.start pat.end
+                                |> Ok
+
+                        { parsedArg = Just arg, definedArgType = Just argType } ->
+                            canonicalizePattern context arg
+                                |> Result.map
+                                    (\canArg ->
+                                        { rootCtorOpts
+                                            | arg =
+                                                Just
+                                                    { arg = canArg
+                                                    , tipe = argType
+                                                    }
+                                        }
+                                            |> CanonicalAst.PCtor
+                                            |> SourcePosition.at pat.start pat.end
+                                    )
+
+                        { parsedArg = Nothing, definedArgType = Just argType } ->
+                            Err <| CtorRequiresArg argType
+
+                        { parsedArg = Just _, definedArgType = Nothing } ->
+                            Err <| CtorTakesNoArg
+                                
 
                 -- more than one hit
                 Just { first, rest } ->
