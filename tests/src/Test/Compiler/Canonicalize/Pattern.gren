@@ -362,6 +362,34 @@ tests =
 
                         _ ->
                             Expect.fail "Expected PCtor"
+            , test "Qualified, no arg" <| \_ ->
+                let
+                    myTypeCtors =
+                        [ { name = "MyCtor"
+                          , index = 0
+                          , arg = Nothing
+                          }
+                        ]
+                
+                    context =
+                        rootContext
+                            |> withQualifiedCtors PackageName.example "MyType" "MyType" myTypeCtors
+                in
+                expectCanonicalizePatternFlex context "MyType.MyCtor" <| \result ->
+                    when result is
+                        CanonicalAst.PCtor ctor ->
+                            Expect.equal
+                              { home = unsafeModuleName "MyType"
+                              , tipe = "MyType"
+                              , union = unionFromCtors myTypeCtors
+                              , name = "MyCtor"
+                              , index = 0
+                              , arg = Nothing
+                              }
+                              ctor
+
+                        _ ->
+                            Expect.fail "Expected PCtor"
             ]
         , describe "Combined Patterns" <|
             let
@@ -669,6 +697,7 @@ packageContext pkg currentModule =
     { pkg = pkg
     , currentModule = unsafeModuleName currentModule
     , qualifiedVars = Dict.empty
+    , qualifiedCtors = Dict.empty
     , scope = Dict.empty
     , scopedCtors = Dict.empty
     }
@@ -760,30 +789,40 @@ withQualifiedCtors pkg mod unionName ctors startingCtx =
     let
         union =
             unionFromCtors ctors
+
+        innerUpdate ctorDef maybeValue =
+            when maybeValue is
+                Just entry ->
+                    Just
+                        { entry | rest = Array.pushLast ctorDef entry.rest }
+
+                Nothing ->
+                    Just
+                        { first = ctorDef
+                        , rest = []
+                        }
     in
     Array.indexedFoldl
         (\idx ctor ctx ->
-            { ctx | scopedCtors =
-                Dict.update
-                    ctor.name
-                    (\maybeValue ->
-                        when maybeValue is
-                            Just entry ->
-                                Just
-                                    { entry
-                                        | rest =
-                                            Array.pushLast
-                                                (qualifiedCtor pkg mod unionName union idx ctor.name ctor.arg)
-                                                entry.rest
-                                        }
+            let
+                ctorDef =
+                    qualifiedCtor pkg mod unionName union idx ctor.name ctor.arg
+            in
+            { ctx
+                | scopedCtors =
+                    Dict.update ctor.name (innerUpdate ctorDef) ctx.scopedCtors
+                , qualifiedCtors =
+                    Dict.update
+                        mod
+                        (\maybeMod ->
+                            when maybeMod is
+                                Just existing ->
+                                    Just <| Dict.update ctor.name (innerUpdate ctorDef) ctx.scopedCtors
 
-                            Nothing ->
-                                Just
-                                    { first = qualifiedCtor pkg mod unionName union idx ctor.name ctor.arg
-                                    , rest = []
-                                    }
-                    )
-                    ctx.scopedCtors
+                                Nothing ->
+                                    Just <| Dict.singleton ctor.name { first = ctorDef, rest = [] }
+                        )
+                        ctx.qualifiedCtors
             }
         )
         startingCtx

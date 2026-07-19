@@ -30,6 +30,7 @@ type Error
     | ModuleNotFound String
     | UnknownVar String
     | UnknownCtor String
+    | UnknownCtorInModule { moduleName : String, ctorName : String }
     | CtorRequiresArg CanonicalAst.Type
     | CtorTakesNoArg
     | AmbiguousVar { name : String, modules : Array { package : PackageName, module_ : ModuleName } }
@@ -44,6 +45,7 @@ type alias Context =
     , currentModule : ModuleName
     -- Dict <qualifier> (Dict <name> entry)
     , qualifiedVars : Dict String (Dict String (OneOrMore QualifiedEntry))
+    , qualifiedCtors : Dict String (Dict String (OneOrMore QualifiedCtor))
     -- Dict <possible qualified ref> ctor
     , scope : Dict String ScopeEntry
     , scopedCtors : Dict String (OneOrMore QualifiedCtor)
@@ -405,61 +407,69 @@ canonicalizePattern context pat =
                 (canonicalizePattern context pattern)
 
         ParseAst.PCtor opts ->
-            when Dict.get opts.name.value context.scopedCtors is
+            canonicalizeCtor context pat opts.name.value opts.arg context.scopedCtors
+
+        ParseAst.PCtorQual opts ->
+            when Dict.get opts.module_ context.qualifiedCtors is
                 Nothing ->
-                    Err (UnknownCtor opts.name.value)
+                    Err <| UnknownCtorInModule { moduleName = opts.module_, ctorName = opts.name }
 
-                Just { first = ctor, rest = [] } ->
-                    let
-                        rootCtorOpts =
-                            { arg = Nothing
-                            , home = ctor.module_
-                            , index = ctor.index
-                            , name = ctor.name
-                            , tipe = ctor.unionName -- TODO
-                            , union = ctor.union
-                            }
-                    in
-                    when { parsedArg = opts.arg, definedArgType = ctor.argType } is
-                        { parsedArg = Nothing, definedArgType = Nothing } ->
-                            CanonicalAst.PCtor rootCtorOpts
-                                |> SourcePosition.at pat.start pat.end
-                                |> Ok
+                Just ctorDict ->
+                    canonicalizeCtor context pat opts.name opts.arg ctorDict
 
-                        { parsedArg = Just arg, definedArgType = Just argType } ->
-                            canonicalizePattern context arg
-                                |> Result.map
-                                    (\canArg ->
-                                        { rootCtorOpts
-                                            | arg =
-                                                Just
-                                                    { arg = canArg
-                                                    , tipe = argType
-                                                    }
-                                        }
-                                            |> CanonicalAst.PCtor
-                                            |> SourcePosition.at pat.start pat.end
-                                    )
 
-                        { parsedArg = Nothing, definedArgType = Just argType } ->
-                            Err <| CtorRequiresArg argType
+canonicalizeCtor : Context -> ParseAst.Pattern-> String -> Maybe ParseAst.Pattern -> Dict String (OneOrMore QualifiedCtor) -> Result Error CanonicalAst.Pattern
+canonicalizeCtor context pat ctorName maybeArg ctorDict =
+    when Dict.get ctorName ctorDict is
+        Nothing ->
+            Err (UnknownCtor ctorName)
 
-                        { parsedArg = Just _, definedArgType = Nothing } ->
-                            Err <| CtorTakesNoArg
-                                
+        Just { first = ctor, rest = [] } ->
+            let
+                rootCtorOpts =
+                    { arg = Nothing
+                    , home = ctor.module_
+                    , index = ctor.index
+                    , name = ctor.name
+                    , tipe = ctor.unionName -- TODO
+                    , union = ctor.union
+                    }
+            in
+            when { parsedArg = maybeArg, definedArgType = ctor.argType } is
+                { parsedArg = Nothing, definedArgType = Nothing } ->
+                    CanonicalAst.PCtor rootCtorOpts
+                        |> SourcePosition.at pat.start pat.end
+                        |> Ok
 
-                -- more than one hit
-                Just { first, rest } ->
-                    let
-                        mods =
-                            Array.pushFirst first rest
-                                |> Array.map (\e -> { package = e.package, module_ = e.module_ })
-                    in
-                    Err (AmbiguousVar { name = opts.name.value, modules = mods })
+                { parsedArg = Just arg, definedArgType = Just argType } ->
+                    canonicalizePattern context arg
+                        |> Result.map
+                            (\canArg ->
+                                { rootCtorOpts
+                                    | arg =
+                                        Just
+                                            { arg = canArg
+                                            , tipe = argType
+                                            }
+                                }
+                                    |> CanonicalAst.PCtor
+                                    |> SourcePosition.at pat.start pat.end
+                            )
 
-        ParseAst.PCtorQual _ ->
-            Err PlaceholderError  -- TODO: implement qualified constructor pattern resolution
+                { parsedArg = Nothing, definedArgType = Just argType } ->
+                    Err <| CtorRequiresArg argType
 
+                { parsedArg = Just _, definedArgType = Nothing } ->
+                    Err <| CtorTakesNoArg
+
+        -- more than one hit
+        Just { first, rest } ->
+            let
+                mods =
+                    Array.pushFirst first rest
+                        |> Array.map (\e -> { package = e.package, module_ = e.module_ })
+            in
+            Err (AmbiguousVar { name = ctorName, modules = mods })
 
 canonicalizeRecordField : Context -> ParseAst.PRecordField -> Result Error CanonicalAst.PatternRecordField
 canonicalizeRecordField context field =
