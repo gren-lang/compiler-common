@@ -123,6 +123,24 @@ canonicalize_ context expr =
         ParseAst.Accessor str ->
             Ok (CanonicalAst.Accessor str)
 
+        ParseAst.Access { expression = innerExpr, accessor } ->
+            canonicalize context innerExpr
+                |> Result.map
+                    (\canInner ->
+                        CanonicalAst.Access
+                            { expression = canInner
+                            , name =
+                                SourcePosition.at
+                                    { row = canInner.end.row
+                                    , col = canInner.end.col + 1
+                                    }
+                                    { row = canInner.end.row
+                                    , col = canInner.end.col + 1 + String.count accessor
+                                    }
+                                    accessor
+                            }
+                    )
+
         ParseAst.Parens innerExpr ->
             canonicalize_ context innerExpr.value
 
@@ -312,6 +330,60 @@ canonicalize_ context expr =
                 )
                 extendedScopeResult
 
+        ParseAst.If opts ->
+            Array.foldl
+                (\{ test, body } acc ->
+                    Result.map3
+                        (\canTest canBody branches ->
+                            Array.pushLast { test = canTest, body = canBody } branches
+                        )
+                        (canonicalize context test)
+                        (canonicalize context body)
+                        acc
+                )
+                (Ok [])
+                opts.branches
+                |> Result.map2
+                    (\elseBranch branches ->
+                        CanonicalAst.If
+                            { branches = branches
+                            , elseBranch = elseBranch
+                            }
+                    )
+                    (canonicalize context opts.elseBranch)
+
+        ParseAst.When opts ->
+            Array.foldl
+                (\{ pattern, body } acc ->
+                    Result.andThen
+                        (\branches ->
+                            canonicalizePattern context pattern
+                                |> Result.andThen
+                                    (\canPattern ->
+                                        canonicalize context body
+                                            |> Result.map
+                                                (\canBody ->
+                                                    Array.pushLast
+                                                        { pattern = canPattern
+                                                        , expression = canBody
+                                                        }
+                                                        branches
+                                                )
+                                    )
+                        )
+                        acc
+                )
+                (Ok [])
+                opts.branches
+                |> Result.map2
+                    (\testExpression branches ->
+                        CanonicalAst.When
+                            { expression = testExpression
+                            , branches = branches
+                            }
+                    )
+                    (canonicalize context opts.expression)
+
         _ ->
             Err PlaceholderError
 
@@ -321,6 +393,7 @@ canonicalize_ context expr =
 
 canonicalizePattern : Context -> ParseAst.Pattern -> Result Error CanonicalAst.Pattern
 canonicalizePattern context pat =
+    -- TODO: name extraction?
     when pat.value is
         ParseAst.PAnything _ ->
             Ok (SourcePosition.at pat.start pat.end CanonicalAst.PAnything)
@@ -470,6 +543,7 @@ canonicalizeCtor context pat ctorName maybeArg ctorDict =
                         |> Array.map (\e -> { package = e.package, module_ = e.module_ })
             in
             Err (AmbiguousVar { name = ctorName, modules = mods })
+
 
 canonicalizeRecordField : Context -> ParseAst.PRecordField -> Result Error CanonicalAst.PatternRecordField
 canonicalizeRecordField context field =

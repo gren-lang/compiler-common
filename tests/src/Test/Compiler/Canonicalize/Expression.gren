@@ -39,6 +39,23 @@ tests =
                 expectPrim "\"hello\"" (CanonicalAst.Str "hello")
             , test "Accessor" <| \_ ->
                 expectPrim ".field" (CanonicalAst.Accessor "field")
+            , test "Access" <| \_ ->
+                expectPrim
+                    -- TODO: update example to record when supported
+                    "(\"hello\").field"
+                    (CanonicalAst.Access
+                        { expression =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 10 }
+                                (CanonicalAst.Str "hello")
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 11 }
+                                { row = 1, col = 16 }
+                                "field"
+                        }
+                    )
             , test "Negate" <| \_ ->
                 expectCanonicalizeFlex primContext "-42" <| \result ->
                     when result is
@@ -428,6 +445,10 @@ tests =
                         }
                     )
             ]
+        , describe "if"
+            []
+        , describe "when"
+            []
         ]
 
 
