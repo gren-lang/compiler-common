@@ -596,6 +596,28 @@ tests =
                         _ ->
                             Expect.fail "Expected Update"
             ]
+        , describe "Operators"
+            [ test "Operator reference" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedOperator
+                                "Test"
+                                { fn = "add"
+                                , symbol = "+"
+                                , associativity = ParseAst.OpALeft
+                                , precedence = 10
+                                }
+                in
+                expectCanonicalize context "(+)"
+                    (CanonicalAst.VarOperator
+                        { symbol = "+"
+                        , home = unsafeModuleName "Test"
+                        , realName = "add"
+                        , annotation = dummyAnnotation
+                        }
+                    )
+            ]
         ]
 
 
@@ -658,6 +680,7 @@ packageContext pkg currentModule =
     , qualifiedCtors = Dict.empty
     , scope = Dict.empty
     , scopedCtors = Dict.empty
+    , scopedOperators = Dict.empty
     }
 
 
@@ -720,4 +743,11 @@ withScopedImported : String -> Canonicalize.QualifiedEntry -> Canonicalize.Conte
 withScopedImported name entry ctx =
     { ctx | scope =
         Dict.set name (Canonicalize.Imported { entry = entry, position = dummyRegion }) ctx.scope
+    }
+
+
+withScopedOperator : String -> ParseAst.Infix -> Canonicalize.Context -> Canonicalize.Context
+withScopedOperator modName infix ctx =
+    { ctx | scopedOperators =
+        Dict.set infix.symbol { moduleName = unsafeModuleName modName, operator = infix } ctx.scopedOperators
     }

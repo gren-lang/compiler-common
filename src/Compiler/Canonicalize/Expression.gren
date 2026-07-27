@@ -29,6 +29,7 @@ type Error
     | InvalidModuleName String
     | ModuleNotFound String
     | UnknownVar String
+    | UnknownOperator String
     | UnknownCtor String
     | UnknownCtorInModule { moduleName : String, ctorName : String }
     | CtorRequiresArg CanonicalAst.Type
@@ -49,6 +50,7 @@ type alias Context =
     -- Dict <possible qualified ref> ctor
     , scope : Dict String ScopeEntry
     , scopedCtors : Dict String (OneOrMore QualifiedCtor)
+    , scopedOperators : Dict String { moduleName : ModuleName, operator : ParseAst.Infix }
     }
 
 
@@ -442,6 +444,25 @@ canonicalize_ context expr =
                                         }
                                 )
                     )
+
+        ParseAst.Operator symbol ->
+            when Dict.get symbol context.scopedOperators is
+                Just { moduleName, operator } ->
+                    Ok
+                        (CanonicalAst.VarOperator
+                            { home = moduleName
+                            , realName = operator.fn
+                            , symbol = symbol
+                            , annotation =
+                                -- TODO
+                                { freeVars = Set.fromArray []
+                                , tipe = CanonicalAst.TVar "a"
+                                }
+                            }
+                        )
+
+                Nothing ->
+                    Err (UnknownOperator symbol)
 
         _ ->
             Err PlaceholderError

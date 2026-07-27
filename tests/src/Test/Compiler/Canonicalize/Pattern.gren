@@ -700,6 +700,7 @@ packageContext pkg currentModule =
     , qualifiedCtors = Dict.empty
     , scope = Dict.empty
     , scopedCtors = Dict.empty
+    , scopedOperators = Dict.empty
     }
 
 
