@@ -187,6 +187,7 @@ canonicalize_ context expr =
                     let
                         entry =
                             importedEntry.entry
+
                         moduleStr =
                             ModuleName.toString entry.module_
                     in

@@ -338,9 +338,7 @@ tests =
                     when result is
                         CanonicalAst.Lambda lambda ->
                             Expect.all
-                                [ .patterns >> Array.length >> Expect.equal 2
-                                , .patterns >> Array.get 0 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "x"))
-                                , .patterns >> Array.get 1 >> Maybe.map .value >> Expect.equal (Just (CanonicalAst.PVar "y"))
+                                [ .patterns >> Array.map .value >> Expect.equalArrays [ CanonicalAst.PVar "x", CanonicalAst.PVar "y"]
                                 , .expression >> .value >> Expect.equal (CanonicalAst.VarLocal "x")
                                 ]
                                 lambda
@@ -446,9 +444,67 @@ tests =
                     )
             ]
         , describe "if"
-            []
+            [ test "Simple example" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "pred"
+                in
+                expectCanonicalizeFlex context "if pred then 1 else 2" <| \result ->
+                    when result is
+                        CanonicalAst.If opts ->
+                            Expect.all
+                                [ .branches >> Expect.equalArrays
+                                    [ { test =
+                                          SourcePosition.at
+                                            { row = 1, col = 4 }
+                                            { row = 1, col = 8 }
+                                            (CanonicalAst.VarLocal "pred")
+                                      , body =
+                                          SourcePosition.at
+                                            { row = 1, col = 14 }
+                                            { row = 1, col = 15 }
+                                            (CanonicalAst.Int 1)
+                                      }
+                                    ]
+                                , .elseBranch >> .value >> Expect.equal (CanonicalAst.Int 2)
+                                ]
+                                opts
+
+                        _ ->
+                            Expect.fail "Expected if"
+            ]
         , describe "when"
-            []
+            [ test "Simple example" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "num"
+                in
+                expectCanonicalizeFlex context "when num is 1 -> 0" <| \result ->
+                    when result is
+                        CanonicalAst.When opts ->
+                            Expect.all
+                                [ .expression >> .value >> Expect.equal (CanonicalAst.VarLocal "num")
+                                , .branches >> Expect.equalArrays
+                                    [ { pattern =
+                                          SourcePosition.at
+                                            { row = 1, col = 13 }
+                                            { row = 1, col = 14 }
+                                            (CanonicalAst.PInt 1)
+                                      , expression =
+                                          SourcePosition.at
+                                            { row = 1, col = 18 }
+                                            { row = 1, col = 19 }
+                                            (CanonicalAst.Int 0)
+                                      }
+                                    ]
+                                ]
+                                opts
+
+                        _ ->
+                            Expect.fail "Expected when"
+            ]
         ]
 
 
