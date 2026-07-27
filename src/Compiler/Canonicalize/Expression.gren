@@ -385,6 +385,64 @@ canonicalize_ context expr =
                     )
                     (canonicalize context opts.expression)
 
+        ParseAst.ArrayLiteral arr ->
+            Array.foldl
+                (\exp acc ->
+                    Result.andThen
+                        (\prev ->
+                            canonicalize context exp
+                                |> Result.map (\canExp -> Array.pushLast canExp prev)
+                        )
+                        acc
+                )
+                (Ok [])
+                arr
+                |> Result.map CanonicalAst.Array
+
+        ParseAst.Record rec ->
+            Array.foldl
+                (\{ field, value } acc ->
+                    Result.andThen
+                        (\prev ->
+                            canonicalize context value
+                                |> Result.map
+                                    (\canExp ->
+                                        Array.pushLast { name = field, expression = canExp } prev
+                                    )
+                        )
+                        acc
+                )
+                (Ok [])
+                rec
+                |> Result.map CanonicalAst.Record
+
+        ParseAst.Update update ->
+            Array.foldl
+                (\{ field, value } acc ->
+                    Result.andThen
+                        (\prev ->
+                            canonicalize context value
+                                |> Result.map
+                                    (\canExp ->
+                                        Array.pushLast { name = field, expression = canExp } prev
+                                    )
+                        )
+                        acc
+                )
+                (Ok [])
+                update.newValues
+                |> Result.andThen
+                    (\fields ->
+                        canonicalize context update.record
+                            |> Result.map
+                                (\exp ->
+                                    CanonicalAst.Update
+                                        { expression = exp
+                                        , newFields = fields
+                                        }
+                                )
+                    )
+
         _ ->
             Err PlaceholderError
 

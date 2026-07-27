@@ -505,6 +505,97 @@ tests =
                         _ ->
                             Expect.fail "Expected when"
             ]
+        , describe "Array"
+            [ test "Simple example" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "[ 1, 2, 3 ]" <| \result ->
+                    when result is
+                        CanonicalAst.Array arr ->
+                            Expect.equalArrays
+                                [ CanonicalAst.Int 1
+                                , CanonicalAst.Int 2
+                                , CanonicalAst.Int 3
+                                ]
+                                (Array.map .value arr)
+
+                        _ ->
+                            Expect.fail "Expected Array"
+            ]
+        , describe "records"
+            [ test "Simple example" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "{ a = 1, b = 2 }" <| \result ->
+                    when result is
+                        CanonicalAst.Record rec ->
+                            Expect.equalArrays
+                                [ { name =
+                                      SourcePosition.at
+                                        { row = 1, col = 3 }
+                                        { row = 1, col = 4 }
+                                        "a"
+                                  , expression =
+                                      SourcePosition.at
+                                        { row = 1, col = 7 }
+                                        { row = 1, col = 8 }
+                                        (CanonicalAst.Int 1)
+                                  }
+                                , { name =
+                                      SourcePosition.at
+                                        { row = 1, col = 10 }
+                                        { row = 1, col = 11 }
+                                        "b"
+                                  , expression =
+                                      SourcePosition.at
+                                        { row = 1, col = 14 }
+                                        { row = 1, col = 15 }
+                                        (CanonicalAst.Int 2)
+                                  }
+                                ]
+                                rec
+
+                        _ ->
+                            Expect.fail "Expected Record"
+            , test "Update" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "a"
+                in
+                expectCanonicalizeFlex context "{ a | b = 3 }" <| \result ->
+                    when result is
+                        CanonicalAst.Update opts ->
+                            Expect.all
+                                [ .expression >> Expect.equal
+                                    (SourcePosition.at
+                                        { row = 1, col = 3 }
+                                        { row = 1, col = 4 }
+                                        (CanonicalAst.VarLocal "a")
+                                    )
+                                , .newFields >> Expect.equalArrays
+                                    [ { name =
+                                          SourcePosition.at
+                                            { row = 1, col = 7 }
+                                            { row = 1, col = 8 }
+                                            "b"
+                                      , expression =
+                                          SourcePosition.at
+                                            { row = 1, col = 11 }
+                                            { row = 1, col = 12 }
+                                            (CanonicalAst.Int 3)
+                                      }
+                                    ]
+                                ]
+                                opts
+
+                        _ ->
+                            Expect.fail "Expected Update"
+            ]
         ]
 
 
