@@ -617,6 +617,37 @@ tests =
                         , annotation = dummyAnnotation
                         }
                     )
+            -- TODO: longer chain, associativity, precedense, errors
+            , test "Binop expression" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedOperator
+                                "Test"
+                                { fn = "add"
+                                , symbol = "+"
+                                , associativity = ParseAst.OpALeft
+                                , precedence = 10
+                                }
+                in
+                expectCanonicalize context "1 + 2"
+                    (CanonicalAst.Binop
+                        { symbol = "+"
+                        , home = unsafeModuleName "Test"
+                        , realName = "add"
+                        , annotation = dummyAnnotation
+                        , left =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 2 }
+                                (CanonicalAst.Int 1)
+                        , right =
+                            SourcePosition.at
+                                { row = 1, col = 5 }
+                                { row = 1, col = 6 }
+                                (CanonicalAst.Int 2)
+                        }
+                    )
             ]
         ]
 
