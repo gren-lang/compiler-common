@@ -14,6 +14,7 @@ module Compiler.Canonicalize.Expression exposing
     )
 
 
+import Array.Builder
 import Compiler.Ast.Source as ParseAst
 import Compiler.Ast.Canonical as CanonicalAst exposing (Annotation)
 import Compiler.Parse.Number as Number
@@ -464,8 +465,147 @@ canonicalize_ context expr =
                 Nothing ->
                     Err (UnknownOperator symbol)
 
+        ParseAst.Binops bin ->
+            gatherBinops bin.left bin.operator (Array.Builder.empty 1)
+                |> Array.Builder.toArray
+                |> Array.map
+                    (\segment ->
+                        Result.map2
+                            (\canLeft canOp ->
+                                { expression = canLeft
+                                , operator = canOp
+                                }
+                            )
+                            (canonicalize context segment.expression)
+                            ( when Dict.get segment.operator.value context.scopedOperators is
+                                Nothing ->
+                                    Err (UnknownOperator segment.operator.value)
+
+                                Just canOp ->
+                                    Ok canOp
+                            )
+                    )
+                |> Result.allOk
+                |> Result.mapError
+                    (\errs ->
+                        Array.get 0 errs
+                            |> Maybe.withDefault PlaceholderError
+                    )
+                |> Result.map2
+                    (\canRight canSegs ->
+                        BS_More { segments = canSegs, final = canRight }
+                    )
+                    (canonicalize context bin.right)
+                |> Result.andThen runBinopStepper
+                |> Result.map .value
+
+
+type alias BinopSegment =
+    { expression : ParseAst.Expression
+    , operator : SourcePosition.Located String
+    }
+
+
+type alias CanonicalBinopSegment =
+    { expression : CanonicalAst.Expression
+    , operator : { moduleName : ModuleName, operator : ParseAst.Infix }
+    }
+
+
+gatherBinops : ParseAst.Expression -> SourcePosition.Located String -> Array.Builder.Builder BinopSegment -> Array.Builder.Builder BinopSegment
+gatherBinops rootExpression rootOperator builder =
+    when rootExpression.value is
+        ParseAst.Binops { left, operator, right } ->
+            gatherBinops left operator builder
+                |> Array.Builder.pushLast { expression = right, operator = rootOperator }
+
         _ ->
-            Err PlaceholderError
+            Array.Builder.pushLast { expression = rootExpression, operator = rootOperator } builder
+
+
+type BinopStep
+  = BS_Done CanonicalAst.Expression
+  | BS_More { segments : Array CanonicalBinopSegment, final : CanonicalAst.Expression }
+  | BS_Error { left : { moduleName : ModuleName, operator : ParseAst.Infix }, right : { moduleName : ModuleName, operator : ParseAst.Infix} }
+
+
+runBinopStepper : BinopStep -> Result Error CanonicalAst.Expression
+runBinopStepper step =
+  when step is
+    BS_Done expr ->
+      Ok expr
+
+    BS_More { segments = [], final } ->
+      Ok final
+
+    BS_More { segments, final } ->
+        when Array.popFirst segments is
+            Just { first, rest } ->
+                runBinopStepper <|
+                    toBinopStep (toBinop first.operator first.expression) first.operator rest final
+
+            _ ->
+                Err PlaceholderError
+
+    BS_Error { left, right } ->
+      Err PlaceholderError
+
+
+toBinopStep : (CanonicalAst.Expression -> CanonicalAst.Expression) -> { moduleName : ModuleName, operator : ParseAst.Infix } -> Array CanonicalBinopSegment -> CanonicalAst.Expression -> BinopStep
+toBinopStep makeBinop rootOp segments final =
+  when Array.popFirst segments is
+    Nothing ->
+      BS_Done (makeBinop final)
+
+    Just { first = { expression, operator }, rest } ->
+        if operator.operator.precedence < rootOp.operator.precedence then
+            BS_More
+                { segments = Array.pushFirst { expression = makeBinop expression, operator = operator } rest
+                , final = final
+                }
+
+        else
+            if operator.operator.precedence > rootOp.operator.precedence then
+                when toBinopStep (toBinop operator expression) operator rest final is
+                    BS_Done newLast ->
+                        BS_Done (makeBinop newLast)
+
+                    BS_More { segments = newSegments, final = newFinal } ->
+                        toBinopStep makeBinop rootOp newSegments newFinal
+
+                    BS_Error info ->
+                        BS_Error info
+
+            else
+                when { root = rootOp.operator.associativity, current = operator.operator.associativity } is
+                    { root = ParseAst.OpALeft, current = ParseAst.OpALeft } ->
+                        toBinopStep (\right -> toBinop operator (makeBinop expression) right) operator rest final
+
+                    { root = ParseAst.OpARight, current = ParseAst.OpARight } ->
+                        toBinopStep (\right -> makeBinop (toBinop operator expression right)) operator rest final
+
+                    _ ->
+                        BS_Error { left = rootOp, right = operator }
+
+
+toBinop : { moduleName : ModuleName, operator : ParseAst.Infix } -> CanonicalAst.Expression -> CanonicalAst.Expression -> CanonicalAst.Expression
+toBinop op left right =
+    SourcePosition.at
+        left.start
+        right.end
+        ( CanonicalAst.Binop
+            { symbol = op.operator.symbol
+            , home = op.moduleName
+            , realName = op.operator.fn
+            , annotation =
+                -- TODO
+                { freeVars = Set.fromArray []
+                , tipe = CanonicalAst.TVar "a"
+                }
+            , left = left
+            , right = right
+            }
+        )
 
 
 -- Pattern Canonicalization
