@@ -1,0 +1,60 @@
+Ok 
+    (Dict.fromArray 
+        [
+            { key = "MyModule"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = Declare 
+                    { decls = SaveTheEnvironment
+                    , def = Def 
+                        { body = 
+                            { end = 
+                                { col = 7
+                                , row = 3 
+                                }
+                            , start = 
+                                { col = 5
+                                , row = 3 
+                                }
+                            , value = Int 42 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 2
+                                , row = 3 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 3 
+                                }
+                            , value = "x" 
+                            }
+                        , params = 
+                            [
+                            ] 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 16
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "MyModule"
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        ]
+    )

@@ -8,6 +8,7 @@ import FileSystem.Path as Path
 import Test.Runner.Effectful as Effectful exposing (run, describe, test, await)
 import Snapshot
 import Snapshot.Compiler.Parse.Module
+import Snapshot.Compiler.Canonicalize.Module
 
 
 main : Effectful.Program a
@@ -21,4 +22,5 @@ main =
                     , record = False
                     }
                     [ Snapshot.Compiler.Parse.Module.tests
+                    , Snapshot.Compiler.Canonicalize.Module.tests
                     ]

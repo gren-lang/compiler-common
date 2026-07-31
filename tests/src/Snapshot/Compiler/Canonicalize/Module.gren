@@ -1,0 +1,74 @@
+module Snapshot.Compiler.Canonicalize.Module exposing (tests)
+
+import Snapshot exposing (test)
+import String.Parser.Advanced as Parser
+import Compiler.Canonicalize.Module as Canonicalize exposing (SourceModule, Error(..))
+import Compiler.Ast.Source as ParseAst
+import Compiler.Ast.Canonical as CanonicalAst
+import Compiler.Parse.Context exposing (Context)
+import Compiler.PackageName as PackageName
+import Compiler.Parse.Module as ModParser
+import Compiler.ModuleName as ModuleName
+import Compiler.SourcePosition as SourcePosition exposing (Position, Region, Located, at)
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Compiler.Parse.Module as ParseModule
+import Compiler.Parse.Context as Context exposing (Context)
+import Compiler.Parse.Number as Number
+import Dict exposing (Dict)
+import String.Parser.Advanced as Parser
+
+
+tests : Snapshot.Test
+tests =
+    Snapshot.describe "Canonicalize.Module"
+        [ test "Module with single variable" <| \_ ->
+            canonicalize
+                [ { package = PackageName.example
+                  , source =
+                    """
+                    module MyModule exposing (..)
+
+                    x = 42
+                    """
+                  }
+                ]
+                |> Snapshot.this
+        ]
+
+
+canonicalize : Array { package : PackageName, source : String } -> Result (Array String) (Dict String CanonicalAst.Module)
+canonicalize sources =
+    sources
+        |> Array.map parseModule
+        |> Result.allOk
+        |> Result.map
+            (\mods ->
+                Array.foldl
+                    (\mod dict -> Dict.set (ParseAst.moduleName mod.ast).value mod dict )
+                    Dict.empty
+                    mods
+            )
+        |> Result.andThen canonicalizeModules
+
+
+parseModule : { package : PackageName, source : String } -> Result String { package : PackageName, ast : ParseAst.Module }
+parseModule mod =
+    when Parser.run ModParser.parser Context.empty mod.source is
+        Ok parsedSource ->
+            Ok
+                { package = mod.package
+                , ast = parsedSource
+                }
+
+        Err errs ->
+            Err <| ModParser.errorsToString mod.source errs
+
+
+canonicalizeModules : Dict String Canonicalize.SourceModule -> Result (Array String) (Dict String CanonicalAst.Module)
+canonicalizeModules parsedMods =
+    when Canonicalize.canonicalize PackageName.example parsedMods Dict.empty is
+        Err canErrs ->
+            Err [ Debug.toString canErrs ]
+
+        Ok mods ->
+            Ok mods
