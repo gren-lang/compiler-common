@@ -21,7 +21,7 @@ Ok
                 { col = 8
                 , row = 1 
                 }
-            , value = "Test" 
+            , value = ModuleName "Test" 
             }
         , requires = 
             [

@@ -46,7 +46,7 @@ Ok
                 { col = 15
                 , row = 1 
                 }
-            , value = "FxModule" 
+            , value = ModuleName "FxModule" 
             }
         , requires = 
             [

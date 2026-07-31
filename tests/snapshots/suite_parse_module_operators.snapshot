@@ -68,7 +68,7 @@ Ok
                 { col = 8
                 , row = 1 
                 }
-            , value = "MyModule" 
+            , value = ModuleName "MyModule" 
             }
         , requires = 
             [

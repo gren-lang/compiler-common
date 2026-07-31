@@ -21,7 +21,7 @@ Ok
                 { col = 13
                 , row = 1 
                 }
-            , value = "PortModule" 
+            , value = ModuleName "PortModule" 
             }
         , requires = 
             [

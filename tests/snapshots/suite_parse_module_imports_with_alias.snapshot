@@ -20,7 +20,9 @@ Ok
                     , row = 3 
                     }
                 , value = 
-                    { alias = Just "A"
+                    { alias = Just 
+                        (ModuleName "A"
+                        )
                     , args = 
                         [
                         ]
@@ -36,7 +38,7 @@ Ok
                             { col = 8
                             , row = 3 
                             }
-                        , value = "Array" 
+                        , value = ModuleName "Array" 
                         } 
                     } 
                 }
@@ -50,7 +52,7 @@ Ok
                 { col = 8
                 , row = 1 
                 }
-            , value = "MyModule" 
+            , value = ModuleName "MyModule" 
             }
         , requires = 
             [

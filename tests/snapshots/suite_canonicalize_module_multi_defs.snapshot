@@ -1,0 +1,89 @@
+Ok 
+    (Dict.fromArray 
+        [
+            { key = "MyBigModule"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = Declare 
+                    { decls = Declare 
+                        { decls = SaveTheEnvironment
+                        , def = Def 
+                            { body = 
+                                { end = 
+                                    { col = 7
+                                    , row = 3 
+                                    }
+                                , start = 
+                                    { col = 5
+                                    , row = 3 
+                                    }
+                                , value = Int 42 
+                                }
+                            , name = 
+                                { end = 
+                                    { col = 2
+                                    , row = 3 
+                                    }
+                                , start = 
+                                    { col = 1
+                                    , row = 3 
+                                    }
+                                , value = "x" 
+                                }
+                            , params = 
+                                [
+                                ] 
+                            } 
+                        }
+                    , def = Def 
+                        { body = 
+                            { end = 
+                                { col = 6
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 5
+                                , row = 5 
+                                }
+                            , value = VarLocal "x" 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 2
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 5 
+                                }
+                            , value = "y" 
+                            }
+                        , params = 
+                            [
+                            ] 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 19
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "MyBigModule"
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        ]
+    )

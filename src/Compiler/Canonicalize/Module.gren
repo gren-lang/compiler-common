@@ -24,15 +24,138 @@ type alias SourceModule =
 
 type Error
     = PlaceholderError
-    | InvalidModuleName String
     | ExpressionError Expression.Error
-    | CyclicDependency String
-    | ModuleNotFound String
+    | CyclicDependency ModuleName
+    | ModuleNotFound ModuleName
+
+
+{-| Takes in a `Dict` of parsed modules, where the `String` key represents a module name, and returns
+a `Dict` of canonicalized modules, or `Error`
+-}
+canonicalize : PackageName -> Dict String SourceModule -> Dict String CanonicalAst.Module -> Result Error (Dict String CanonicalAst.Module)
+canonicalize pkg parsedModules initialModules =
+    Dict.foldl
+        (\key parsedModule resultAcc ->
+            Result.andThen
+                (\modulesSoFar ->
+                    if Dict.member key modulesSoFar then
+                        Ok modulesSoFar
+
+                    else
+                        canonicalizeModule pkg parsedModules modulesSoFar Set.empty parsedModule
+                )
+                resultAcc
+        )
+        (Ok initialModules)
+        parsedModules
+
+
+{-| Canonicalize a full module, ensuring dependencies are canonicalized first.
+-}
+canonicalizeModule :
+    PackageName ->
+    Dict String SourceModule ->
+    Dict String CanonicalAst.Module ->
+    Set String ->
+    SourceModule ->
+    Result Error (Dict String CanonicalAst.Module)
+canonicalizeModule pkg parsedModules modules recursionStack sourceModule =
+    let
+        modName =
+            (ParseAst.moduleName sourceModule.ast).value
+
+        modNameString =
+            ModuleName.toString modName
+    in
+    if Set.member modNameString recursionStack then
+        Err (CyclicDependency modName)
+
+    else if Dict.member modNameString modules then
+        Ok modules
+
+    else
+        let
+            newStack =
+                Set.set modNameString recursionStack
+        in
+        Result.andThen
+            (\modulesWithDeps ->
+                canonicalizeModuleContent pkg sourceModule
+                    { pkg = pkg
+                    , currentModule = modName
+                    , qualifiedVars = Dict.empty
+                    , qualifiedCtors = Dict.empty
+                    , scope = Dict.empty
+                    , scopedCtors = Dict.empty
+                    , scopedOperators = Dict.empty
+                    }
+                    |> Result.map (\canonModule -> Dict.set modNameString canonModule modulesWithDeps)
+            )
+            (canonicalizeDependencies pkg parsedModules modules newStack sourceModule.ast)
+
+
+{-| Canonicalize module content (Implementation only).
+For now, only handles Implementation modules with a single value definition.
+-}
+canonicalizeModuleContent : PackageName -> SourceModule -> Expression.Context -> Result Error CanonicalAst.Module
+canonicalizeModuleContent pkg parsedModule rootContext =
+    when parsedModule.ast is
+        ParseAst.Implementation impl ->
+            let
+                context =
+                    { rootContext | scope =
+                        Array.foldl
+                            (\val dict ->
+                                Dict.set
+                                    val.value.value.name.value
+                                    (Expression.Local { position = { start = val.start, end = val.end } })
+                                    dict
+                            )
+                            rootContext.scope
+                            impl.values
+                    }
+
+                exportsResult =
+                    canonicalizeExports impl.exports { start = impl.name.start, end = impl.name.end }
+
+                effectsResult =
+                    canonicalizeEffects impl.effects
+
+                decsResult =
+                    Array.foldl
+                        (\decl declsResult ->
+                            Result.andThen
+                                (\decls ->
+                                    canonicalizeDef context decl.value.value
+                                        |> Result.map (\d -> CanonicalAst.Declare { def = d, decls = decls })
+                                )
+                                declsResult
+                        )
+                        (Ok CanonicalAst.SaveTheEnvironment)
+                        impl.values
+            in
+            Result.map3
+                (\canonicalExports canonicalEffects canDecls ->
+                    { name = impl.name.value
+                    , exports = canonicalExports
+                    , decls = canDecls
+                    , unions = Dict.empty
+                    , aliases = Dict.empty
+                    , binops = Dict.empty
+                    , effects = canonicalEffects
+                    }
+                )
+                exportsResult
+                effectsResult
+                decsResult
+
+        ParseAst.Signature _ ->
+            Err PlaceholderError
 
 
 {-| Extract all module dependencies from requires and imports.
 -}
-getModuleDependencies : ParseAst.Module -> Array String
+getModuleDependencies : ParseAst.Module -> Array ModuleName
 getModuleDependencies mod =
     when mod is
         ParseAst.Implementation impl ->
@@ -127,16 +250,25 @@ canonicalizeDependencies pkg parsedModules modules recursionStack ast =
         (\depName accResult ->
             Result.andThen
                 (\currentModules ->
-                    if Dict.member depName currentModules then
+                    let
+                        depNameStr =
+                            ModuleName.toString depName
+                    in
+                    if Dict.member depNameStr currentModules then
                         Ok currentModules
 
-                    else if Set.member depName recursionStack then
+                    else if Set.member depNameStr recursionStack then
                         Err (CyclicDependency depName)
 
                     else
-                        when Dict.get depName parsedModules is
+                        when Dict.get depNameStr parsedModules is
                             Just parsedDep ->
-                                canonicalizeModule pkg parsedModules currentModules (Set.set depName recursionStack) parsedDep
+                                canonicalizeModule
+                                    pkg
+                                    parsedModules
+                                    currentModules
+                                    (Set.set depNameStr recursionStack)
+                                    parsedDep
 
                             Nothing ->
                                 Err (ModuleNotFound depName)
@@ -145,130 +277,3 @@ canonicalizeDependencies pkg parsedModules modules recursionStack ast =
         )
         (Ok modules)
         depNames
-
-
-{-| Canonicalize a full module, ensuring dependencies are canonicalized first.
--}
-canonicalizeModule :
-    PackageName ->
-    Dict String SourceModule ->
-    Dict String CanonicalAst.Module ->
-    Set String ->
-    SourceModule ->
-    Result Error (Dict String CanonicalAst.Module)
-canonicalizeModule pkg parsedModules modules recursionStack sourceModule =
-    let
-        modName =
-            (ParseAst.moduleName sourceModule.ast).value
-    in
-    if Set.member modName recursionStack then
-        Err (CyclicDependency modName)
-
-    else if Dict.member modName modules then
-        Ok modules
-
-    else
-        let
-            newStack =
-                Set.set modName recursionStack
-        in
-        Result.andThen
-            (\modulesWithDeps ->
-                let
-                    currentMod =
-                        when ModuleName.fromString modName is
-                            Just mn -> mn
-                            Nothing -> Debug.todo "Invalid module name"
-                in
-                canonicalizeModuleContent pkg sourceModule
-                    { pkg = pkg
-                    , currentModule = currentMod
-                    , qualifiedVars = Dict.empty
-                    , qualifiedCtors = Dict.empty
-                    , scope = Dict.empty
-                    , scopedCtors = Dict.empty
-                    , scopedOperators = Dict.empty
-                    }
-                    |> Result.map (\canonModule -> Dict.set modName canonModule modulesWithDeps)
-            )
-            (canonicalizeDependencies pkg parsedModules modules newStack sourceModule.ast)
-
-
-{-| Canonicalize module content (Implementation only).
-For now, only handles Implementation modules with a single value definition.
--}
-canonicalizeModuleContent :
-    PackageName ->
-    SourceModule ->
-    Expression.Context ->
-    Result Error CanonicalAst.Module
-canonicalizeModuleContent pkg parsedModule context =
-    when parsedModule.ast is
-        ParseAst.Implementation impl ->
-            when ModuleName.fromString impl.name.value is
-                Just moduleName ->
-                    let
-                        exportsResult =
-                            canonicalizeExports impl.exports { start = impl.name.start, end = impl.name.end }
-
-                        effectsResult =
-                            canonicalizeEffects impl.effects
-                    in
-                    Result.map2
-                        (\canonicalExports canonicalEffects ->
-                            -- Handle only the case with a single value, no unions, aliases, binops
-                            if Array.length impl.values == 1
-                                && Array.isEmpty impl.unions
-                                && Array.isEmpty impl.aliases
-                                && Array.isEmpty impl.binops then
-                                when Array.get 0 impl.values is
-                                    Just singleValueDecl ->
-                                        canonicalizeDef context singleValueDecl.value.value
-                                            |> Result.map
-                                                (\canonDef ->
-                                                    { name = moduleName
-                                                    , exports = canonicalExports
-                                                    , decls = CanonicalAst.Declare { def = canonDef, decls = CanonicalAst.SaveTheEnvironment }
-                                                    , unions = Dict.empty
-                                                    , aliases = Dict.empty
-                                                    , binops = Dict.empty
-                                                    , effects = canonicalEffects
-                                                    }
-                                                )
-
-                                    Nothing ->
-                                        Err PlaceholderError
-
-                            else
-                                Err PlaceholderError
-                        )
-                        exportsResult
-                        effectsResult
-                        |> Result.andThen Basics.identity
-
-                Nothing ->
-                    Err (InvalidModuleName impl.name.value)
-
-        ParseAst.Signature _ ->
-            Err PlaceholderError
-
-
-{-| Takes in a `Dict` of parsed modules, where the `String` key represents a module name, and returns
-a `Dict` of canonicalized modules, or `Error`
--}
-canonicalize : PackageName -> Dict String SourceModule -> Dict String CanonicalAst.Module -> Result Error (Dict String CanonicalAst.Module)
-canonicalize pkg parsedModules initialModules =
-    Dict.foldl
-        (\key parsedModule resultAcc ->
-            Result.andThen
-                (\modulesSoFar ->
-                    if Dict.member key modulesSoFar then
-                        Ok modulesSoFar
-
-                    else
-                        canonicalizeModule pkg parsedModules modulesSoFar Set.empty parsedModule
-                )
-                resultAcc
-        )
-        (Ok initialModules)
-        parsedModules

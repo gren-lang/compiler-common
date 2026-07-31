@@ -28,7 +28,7 @@ Ok
                             { col = 8
                             , row = 3 
                             }
-                        , value = "Basics" 
+                        , value = ModuleName "Basics" 
                         } 
                     } 
                 }
@@ -42,7 +42,7 @@ Ok
                 { col = 18
                 , row = 1 
                 }
-            , value = "Comparable" 
+            , value = ModuleName "Comparable" 
             }
         , types = 
             [

@@ -34,7 +34,7 @@ Ok
                             { col = 8
                             , row = 3 
                             }
-                        , value = "Array" 
+                        , value = ModuleName "Array" 
                         } 
                     } 
                 }
@@ -48,7 +48,9 @@ Ok
                     , row = 4 
                     }
                 , value = 
-                    { alias = Just "N.M"
+                    { alias = Just 
+                        (ModuleName "N.M"
+                        )
                     , args = 
                         [
                         ]
@@ -77,7 +79,7 @@ Ok
                             { col = 8
                             , row = 4 
                             }
-                        , value = "Nested.Module" 
+                        , value = ModuleName "Nested.Module" 
                         } 
                     } 
                 }
@@ -91,7 +93,7 @@ Ok
                 { col = 8
                 , row = 1 
                 }
-            , value = "MyModule" 
+            , value = ModuleName "MyModule" 
             }
         , requires = 
             [

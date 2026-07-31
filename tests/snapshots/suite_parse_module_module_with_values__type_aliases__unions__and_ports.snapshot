@@ -243,7 +243,7 @@ Ok
                 { col = 8
                 , row = 1 
                 }
-            , value = "MyValues" 
+            , value = ModuleName "MyValues" 
             }
         , requires = 
             [

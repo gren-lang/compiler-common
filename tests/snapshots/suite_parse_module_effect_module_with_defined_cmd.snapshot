@@ -33,7 +33,7 @@ Ok
                 { col = 15
                 , row = 1 
                 }
-            , value = "CmdModule" 
+            , value = ModuleName "CmdModule" 
             }
         , requires = 
             [

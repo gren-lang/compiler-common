@@ -36,7 +36,7 @@ Ok
                             { col = 8
                             , row = 3 
                             }
-                        , value = "String" 
+                        , value = ModuleName "String" 
                         } 
                     } 
                 }
@@ -50,7 +50,9 @@ Ok
                     , row = 4 
                     }
                 , value = 
-                    { alias = Just "StrDict"
+                    { alias = Just 
+                        (ModuleName "StrDict"
+                        )
                     , args = 
                         [
                             { end = 
@@ -61,7 +63,7 @@ Ok
                                 { col = 13
                                 , row = 4 
                                 }
-                            , value = "String" 
+                            , value = ModuleName "String" 
                             }
                         ]
                     , expose = Explicit 
@@ -76,7 +78,7 @@ Ok
                             { col = 8
                             , row = 4 
                             }
-                        , value = "Dict" 
+                        , value = ModuleName "Dict" 
                         } 
                     } 
                 }
@@ -90,7 +92,7 @@ Ok
                 { col = 8
                 , row = 1 
                 }
-            , value = "MyModule" 
+            , value = ModuleName "MyModule" 
             }
         , requires = 
             [

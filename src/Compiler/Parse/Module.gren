@@ -14,6 +14,7 @@ module Compiler.Parse.Module exposing
 
 import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Ast.Source as AST
+import Compiler.ModuleName as ModuleName exposing (ModuleName)
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Space as Space
 import Compiler.Parse.Type as Type
@@ -28,7 +29,8 @@ import Compiler.Parse.Context exposing (Context)
 {-| The kind of errors that can happen while parsing Gren modules.
 -}
 type Error
-    = ExpectedKeyword String
+    = InvalidModuleName String
+    | ExpectedKeyword String
     | ExpectedChar Char
     | VariableError Variable.Error
     | OperatorError Operator.Error
@@ -70,6 +72,9 @@ errorToString error =
 
         TypeError typeError ->
             Type.errorToString typeError
+
+        InvalidModuleName modName ->
+            "'" ++ modName ++ "' is not a valid module name"
 
 
 spaceParser : Parser Context Error {}
@@ -199,12 +204,21 @@ parseImplementationModule =
         |> Parser.keep (Parser.loop [] declarationLoopParser)
 
 
-moduleNameParser : Parser Context Error (SourcePosition.Located String)
+moduleNameParser : Parser Context Error (SourcePosition.Located ModuleName)
 moduleNameParser =
     SourcePosition.parser
         ( Variable.foreignUpper
             |> Parser.mapError VariableError
             |> Parser.map Variable.foreignVarToString
+            |> Parser.andThen
+                (\modName ->
+                    when ModuleName.fromString modName is
+                        Just verifiedName ->
+                            Parser.succeed verifiedName
+
+                        Nothing ->
+                            Parser.problem (InvalidModuleName modName)
+                )
         )
 
 
@@ -551,7 +565,7 @@ importLoopParser imps =
         ]
 
 
-parseImportArgLoop : Array (SourcePosition.Located String) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located String)) (Array (SourcePosition.Located String)))
+parseImportArgLoop : Array (SourcePosition.Located ModuleName) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located ModuleName)) (Array (SourcePosition.Located ModuleName)))
 parseImportArgLoop args =
     Parser.oneOf
         [ Parser.succeed (\next -> Parser.Loop <| Array.pushLast next args)

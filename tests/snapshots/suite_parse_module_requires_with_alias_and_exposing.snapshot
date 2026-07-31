@@ -34,7 +34,7 @@ Ok
                             { col = 8
                             , row = 7 
                             }
-                        , value = "Array" 
+                        , value = ModuleName "Array" 
                         } 
                     } 
                 }
@@ -48,7 +48,9 @@ Ok
                     , row = 8 
                     }
                 , value = 
-                    { alias = Just "N.M"
+                    { alias = Just 
+                        (ModuleName "N.M"
+                        )
                     , args = 
                         [
                         ]
@@ -77,7 +79,7 @@ Ok
                             { col = 8
                             , row = 8 
                             }
-                        , value = "Nested.Module" 
+                        , value = ModuleName "Nested.Module" 
                         } 
                     } 
                 }
@@ -91,7 +93,7 @@ Ok
                 { col = 8
                 , row = 1 
                 }
-            , value = "MyModule" 
+            , value = ModuleName "MyModule" 
             }
         , requires = 
             [
@@ -117,7 +119,7 @@ Ok
                             { col = 9
                             , row = 3 
                             }
-                        , value = "Compare" 
+                        , value = ModuleName "Compare" 
                         } 
                     } 
                 }
@@ -131,7 +133,9 @@ Ok
                     , row = 4 
                     }
                 , value = 
-                    { alias = Just "StrC"
+                    { alias = Just 
+                        (ModuleName "StrC"
+                        )
                     , expose = Explicit 
                         [
                         ]
@@ -144,7 +148,7 @@ Ok
                             { col = 9
                             , row = 4 
                             }
-                        , value = "String.Compare" 
+                        , value = ModuleName "String.Compare" 
                         } 
                     } 
                 }
@@ -169,7 +173,7 @@ Ok
                             { col = 9
                             , row = 5 
                             }
-                        , value = "Package" 
+                        , value = ModuleName "Package" 
                         } 
                     } 
                 }

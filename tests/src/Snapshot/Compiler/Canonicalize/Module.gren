@@ -21,7 +21,7 @@ import String.Parser.Advanced as Parser
 tests : Snapshot.Test
 tests =
     Snapshot.describe "Canonicalize.Module"
-        [ test "Module with single variable" <| \_ ->
+        [ test "Single def" <| \_ ->
             canonicalize
                 [ { package = PackageName.example
                   , source =
@@ -29,6 +29,20 @@ tests =
                     module MyModule exposing (..)
 
                     x = 42
+                    """
+                  }
+                ]
+                |> Snapshot.this
+        , test "Multi defs" <| \_ ->
+            canonicalize
+                [ { package = PackageName.example
+                  , source =
+                    """
+                    module MyBigModule exposing (..)
+
+                    x = 42
+
+                    y = x
                     """
                   }
                 ]
@@ -44,7 +58,7 @@ canonicalize sources =
         |> Result.map
             (\mods ->
                 Array.foldl
-                    (\mod dict -> Dict.set (ParseAst.moduleName mod.ast).value mod dict )
+                    (\mod dict -> Dict.set (ModuleName.toString (ParseAst.moduleName mod.ast).value) mod dict )
                     Dict.empty
                     mods
             )
