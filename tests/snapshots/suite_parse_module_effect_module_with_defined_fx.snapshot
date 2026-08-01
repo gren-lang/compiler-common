@@ -48,6 +48,10 @@ Ok
                 }
             , value = ModuleName "FxModule" 
             }
+        , package = PackageName 
+            { author = "example"
+            , name = "package" 
+            }
         , requires = 
             [
             ]

@@ -44,6 +44,10 @@ Ok
                 }
             , value = ModuleName "Comparable" 
             }
+        , package = PackageName 
+            { author = "example"
+            , name = "package" 
+            }
         , types = 
             [
                 { end = 

@@ -80,6 +80,10 @@ Ok
                         } 
                     }
                 , name = ModuleName "MyBigModule"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
                 , unions = Dict.fromArray 
                     [
                     ] 

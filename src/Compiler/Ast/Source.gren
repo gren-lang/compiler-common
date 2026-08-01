@@ -45,6 +45,7 @@ module Compiler.Ast.Source exposing
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Number as Number
 import Compiler.ModuleName as ModuleName exposing (ModuleName)
+import Compiler.PackageName exposing (PackageName)
 
 
 {-|
@@ -327,6 +328,7 @@ type Module
 -}
 type alias ModuleImplementation =
   { name : SourcePosition.Located ModuleName
+  , package : PackageName
   , exports : Exposing
   , docs : Maybe (SourcePosition.Located String)
   , requires : Array (SourcePosition.Located Require)
@@ -343,6 +345,7 @@ type alias ModuleImplementation =
 -}
 type alias ModuleSignature =
   { name : SourcePosition.Located ModuleName
+  , package : PackageName
   , docs : Maybe (SourcePosition.Located String)
   , imports : Array (SourcePosition.Located Import)
   , values : Array (ModuleDeclaration ValueSignature)

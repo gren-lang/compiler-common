@@ -80,15 +80,7 @@ canonicalizeModule pkg parsedModules modules recursionStack sourceModule =
         in
         Result.andThen
             (\modulesWithDeps ->
-                canonicalizeModuleContent pkg sourceModule
-                    { pkg = pkg
-                    , currentModule = modName
-                    , qualifiedVars = Dict.empty
-                    , qualifiedCtors = Dict.empty
-                    , scope = Dict.empty
-                    , scopedCtors = Dict.empty
-                    , scopedOperators = Dict.empty
-                    }
+                canonicalizeModuleContent pkg modulesWithDeps sourceModule
                     |> Result.map (\canonModule -> Dict.set modNameString canonModule modulesWithDeps)
             )
             (canonicalizeDependencies pkg parsedModules modules newStack sourceModule.ast)
@@ -97,23 +89,13 @@ canonicalizeModule pkg parsedModules modules recursionStack sourceModule =
 {-| Canonicalize module content (Implementation only).
 For now, only handles Implementation modules with a single value definition.
 -}
-canonicalizeModuleContent : PackageName -> SourceModule -> Expression.Context -> Result Error CanonicalAst.Module
-canonicalizeModuleContent pkg parsedModule rootContext =
+canonicalizeModuleContent : PackageName -> Dict String CanonicalAst.Module -> SourceModule -> Result Error CanonicalAst.Module
+canonicalizeModuleContent pkg canModules parsedModule =
     when parsedModule.ast is
         ParseAst.Implementation impl ->
             let
                 context =
-                    { rootContext | scope =
-                        Array.foldl
-                            (\val dict ->
-                                Dict.set
-                                    val.value.value.name.value
-                                    (Expression.Local { position = { start = val.start, end = val.end } })
-                                    dict
-                            )
-                            rootContext.scope
-                            impl.values
-                    }
+                    createExpressionContext pkg canModules impl
 
                 exportsResult =
                     canonicalizeExports impl.exports { start = impl.name.start, end = impl.name.end }
@@ -137,6 +119,7 @@ canonicalizeModuleContent pkg parsedModule rootContext =
             Result.map3
                 (\canonicalExports canonicalEffects canDecls ->
                     { name = impl.name.value
+                    , package = impl.package
                     , exports = canonicalExports
                     , decls = canDecls
                     , unions = Dict.empty
@@ -153,23 +136,103 @@ canonicalizeModuleContent pkg parsedModule rootContext =
             Err PlaceholderError
 
 
-{-| Extract all module dependencies from requires and imports.
--}
-getModuleDependencies : ParseAst.Module -> Array ModuleName
-getModuleDependencies mod =
-    when mod is
-        ParseAst.Implementation impl ->
-            let
-                reqNames =
-                    Array.map (\reqLoc -> reqLoc.value.module_.value) impl.requires
+createExpressionContext : PackageName -> Dict String CanonicalAst.Module -> ParseAst.ModuleImplementation -> Expression.Context
+createExpressionContext pkg canModules parsedModule =
+    { pkg = pkg
+    , currentModule = parsedModule.name.value
+    , qualifiedVars =
+        Array.foldl
+            (\mod qv ->
+                let
+                    modName =
+                        mod.module_.value
 
-                impNames =
-                    Array.map (\impLoc -> impLoc.value.module_.value) impl.imports
-            in
-            Array.append reqNames impNames
+                    qualifier =
+                        mod.alias
+                            |> Maybe.withDefault modName
 
-        ParseAst.Signature _ ->
-            []
+                    values =
+                        Dict.get (ModuleName.toString modName) canModules
+                            |> Maybe.map
+                                (\m ->
+                                    let
+                                        normalizedDefs =
+                                            CanonicalAst.flattenDecls m.decls
+                                                |> Array.map
+                                                    (\d ->
+                                                        when d is
+                                                            CanonicalAst.Def { name } ->
+                                                                { name = name.value
+                                                                , module_ = modName
+                                                                , package = m.package
+                                                                , annotation = dummyAnnotation -- TODO
+                                                                }
+
+                                                            CanonicalAst.TypedDef { name } ->
+                                                                { name = name.value
+                                                                , module_ = modName
+                                                                , package = m.package
+                                                                , annotation = dummyAnnotation -- TODO
+                                                                }
+                                                    )
+                                    in
+                                    when m.exports is
+                                        CanonicalAst.ExportEverything _ ->
+                                            normalizedDefs
+
+                                        CanonicalAst.Export exportDict ->
+                                            let
+                                                names =
+                                                    Dict.keys exportDict
+                                            in
+                                            Array.keepIf (\d -> Array.member d.name names) normalizedDefs
+                                )
+                            |> Maybe.withDefault [] -- In theory, this will never happen
+                in
+                -- TODO: What if there are multiple modules of the same name from different packages?
+                Dict.set
+                    (ModuleName.toString modName)
+                    (Array.foldl
+                        (\def acc ->
+                            Dict.set
+                                def.name
+                                { first =
+                                    { module_ = def.module_
+                                    , package = def.package
+                                    , annotation = def.annotation
+                                    }
+                                , rest = []
+                                }
+                                acc
+                        )
+                        Dict.empty
+                        values
+                    )
+                    qv
+            )
+            Dict.empty
+            (Array.map .value parsedModule.imports)
+    , qualifiedCtors = Dict.empty
+    , scope = 
+        Array.foldl
+            (\val dict ->
+                Dict.set
+                    val.value.value.name.value
+                    (Expression.Local { position = { start = val.start, end = val.end } })
+                    dict
+            )
+            Dict.empty
+            parsedModule.values
+    , scopedCtors = Dict.empty
+    , scopedOperators = Dict.empty
+    }
+
+
+dummyAnnotation : CanonicalAst.Annotation
+dummyAnnotation =
+    { freeVars = Set.empty
+    , tipe = CanonicalAst.TVar "x"
+    }
 
 
 {-| Canonicalize exports from a module.
@@ -277,3 +340,22 @@ canonicalizeDependencies pkg parsedModules modules recursionStack ast =
         )
         (Ok modules)
         depNames
+
+
+{-| Extract all module dependencies from requires and imports.
+-}
+getModuleDependencies : ParseAst.Module -> Array ModuleName
+getModuleDependencies mod =
+    when mod is
+        ParseAst.Implementation impl ->
+            let
+                reqNames =
+                    Array.map (\reqLoc -> reqLoc.value.module_.value) impl.requires
+
+                impNames =
+                    Array.map (\impLoc -> impLoc.value.module_.value) impl.imports
+            in
+            Array.append reqNames impNames
+
+        ParseAst.Signature _ ->
+            []

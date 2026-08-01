@@ -19,6 +19,7 @@ main =
                 Snapshot.suite
                     { filesystemPermission = fsPerm
                     , folder = Path.fromPosixString "./snapshots"
+                    -- TODO: Make this a CLI flag
                     , record = False
                     }
                     [ Snapshot.Compiler.Parse.Module.tests

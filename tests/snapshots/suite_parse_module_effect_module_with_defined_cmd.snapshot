@@ -35,6 +35,10 @@ Ok
                 }
             , value = ModuleName "CmdModule" 
             }
+        , package = PackageName 
+            { author = "example"
+            , name = "package" 
+            }
         , requires = 
             [
             ]

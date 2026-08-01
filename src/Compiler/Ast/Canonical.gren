@@ -8,6 +8,7 @@ package in the List module.
 
 import Compiler.Ast.Source as Src
 import Compiler.ModuleName exposing (ModuleName)
+import Compiler.PackageName exposing (PackageName)
 import Compiler.SourcePosition as SourcePosition
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -158,6 +159,19 @@ type Decls
   | SaveTheEnvironment
 
 
+flattenDecls : Decls -> Array Def
+flattenDecls d =
+  when d is
+    Declare { def, decls } ->
+      Array.pushFirst def (flattenDecls decls)
+
+    DeclareRec { def, defs, decls } ->
+      Array.pushFirst def defs ++ flattenDecls decls
+
+    SaveTheEnvironment ->
+      []
+
+
 -- PATTERNS
 
 
@@ -212,7 +226,8 @@ type alias Annotation =
     }
 
 
-type alias FreeVars = Set String
+type alias FreeVars =
+    Set String
 
 
 type Type
@@ -257,6 +272,7 @@ type alias FieldType =
 
 type alias Module =
   { name : ModuleName
+  , package : PackageName
   , exports : Exports
   , decls : Decls
   , unions : Dict String Union

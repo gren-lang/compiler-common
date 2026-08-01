@@ -7,49 +7,50 @@ import Compiler.Parse.Number as Number
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Ast.Source as AST
 import Compiler.Parse.Context as Context
+import Compiler.PackageName as PackageName
 
 
 tests : Snapshot.Test
 tests =
     Snapshot.describe "Parse.Module"
         [ test "Empty module" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
                 """
                 |> Snapshot.this
         , test "Empty module with exposings (valid when parsing)" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing ( Model, Msg (..), (==), view )
                 """
                 |> Snapshot.this
         , test "the port keyword is optional (going away in future release)" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 port module PortModule exposing (..)
                 """
                 |> Snapshot.this
         , test "effect module with defined cmd" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 effect module CmdModule where { command = MyCmd } exposing (..)
                 """
                 |> Snapshot.this
         , test "effect module with defined sub" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 effect module SubModule where { subscription = MySub } exposing (..)
                 """
                 |> Snapshot.this
         , test "effect module with defined fx" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 effect module FxModule where { command = MyCmd, subscription = MySub } exposing (..)
                 """
                 |> Snapshot.this
         , test "Docs" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
 
@@ -58,7 +59,7 @@ tests =
                 """
                 |> Snapshot.this
         , test "imports" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
 
@@ -66,7 +67,7 @@ tests =
                 """
                 |> Snapshot.this
         , test "imports with alias" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
 
@@ -74,7 +75,7 @@ tests =
                 """
                 |> Snapshot.this
         , test "imports with alias and exposing" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
 
@@ -83,7 +84,7 @@ tests =
                 """
             |> Snapshot.this
         , test "imports end positions" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
 
@@ -94,7 +95,7 @@ tests =
                 """
             |> Snapshot.this
         , test "requires with alias and exposing" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
 
@@ -107,7 +108,7 @@ tests =
                 """
             |> Snapshot.this
         , test "imports with arguments" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
 
@@ -116,7 +117,7 @@ tests =
                 """
                 |> Snapshot.this
         , test "operators" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
 
@@ -126,7 +127,7 @@ tests =
                 """
                 |> Snapshot.this
          , test "Module with values, type aliases, unions, and ports" <| \_ ->
-             Parser.run PM.parser Context.empty
+            parse
                  """
                  module MyValues exposing (..)
 
@@ -146,7 +147,7 @@ tests =
                  """
                  |> Snapshot.this
          , test "Declaration after when expression" <| \_ ->
-             Parser.run PM.parser Context.empty
+            parse
                  """
                  module Test exposing (..)
 
@@ -163,7 +164,7 @@ tests =
                  """
                  |> Snapshot.this
         , test "Function with documentation comment" <| \_ ->
-            Parser.run PM.parser Context.empty
+            parse
                 """
                 module MyModule exposing (..)
 
@@ -178,7 +179,7 @@ tests =
                 """
                 |> Snapshot.this
          , test "Signature module" <| \_ ->
-             Parser.run PM.parser Context.empty
+             parse
                  """
                  signature module Comparable
 
@@ -190,3 +191,7 @@ tests =
                  """
                  |> Snapshot.this
         ]
+
+
+parse code =
+    Parser.run (PM.parser PackageName.example) Context.empty code

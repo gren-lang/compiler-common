@@ -35,6 +35,10 @@ Ok
                 }
             , value = ModuleName "SubModule" 
             }
+        , package = PackageName 
+            { author = "example"
+            , name = "package" 
+            }
         , requires = 
             [
             ]

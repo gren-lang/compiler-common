@@ -33,7 +33,7 @@ tests =
                   }
                 ]
                 |> Snapshot.this
-        , test "Multi defs" <| \_ ->
+        , test "Multiple defs" <| \_ ->
             canonicalize
                 [ { package = PackageName.example
                   , source =
@@ -43,6 +43,28 @@ tests =
                     x = 42
 
                     y = x
+                    """
+                  }
+                ]
+                |> Snapshot.this
+        , test "Reference def in other module" <| \_ ->
+            canonicalize
+                [ { package = PackageName.example
+                  , source =
+                    """
+                    module ModuleOne exposing (..)
+
+                    x = 42
+                    """
+                  }
+                , { package = PackageName.example
+                  , source =
+                    """
+                    module ModuleTwo exposing (..)
+
+                    import ModuleOne
+
+                    y = ModuleOne.x
                     """
                   }
                 ]
@@ -67,7 +89,7 @@ canonicalize sources =
 
 parseModule : { package : PackageName, source : String } -> Result String { package : PackageName, ast : ParseAst.Module }
 parseModule mod =
-    when Parser.run ModParser.parser Context.empty mod.source is
+    when Parser.run (ModParser.parser mod.package) Context.empty mod.source is
         Ok parsedSource ->
             Ok
                 { package = mod.package

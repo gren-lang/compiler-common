@@ -23,6 +23,10 @@ Ok
                 }
             , value = ModuleName "PortModule" 
             }
+        , package = PackageName 
+            { author = "example"
+            , name = "package" 
+            }
         , requires = 
             [
             ]

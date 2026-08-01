@@ -8,13 +8,14 @@ import Compiler.Parse.Number as Number
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Ast.Source as AST
 import Compiler.Parse.Context as Context
+import Compiler.PackageName as PackageName
 
 
 tests : Test
 tests =
     describe "Parse.Module"
         [ test "imports with arguments must have alias" <| \_ ->
-            Parser.run PM.parser Context.empty
+            Parser.run (PM.parser PackageName.example) Context.empty
                 """
                 module MyModule exposing (..)
 

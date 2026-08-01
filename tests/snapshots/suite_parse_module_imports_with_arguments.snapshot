@@ -94,6 +94,10 @@ Ok
                 }
             , value = ModuleName "MyModule" 
             }
+        , package = PackageName 
+            { author = "example"
+            , name = "package" 
+            }
         , requires = 
             [
             ]

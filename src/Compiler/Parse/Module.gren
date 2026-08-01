@@ -15,6 +15,7 @@ module Compiler.Parse.Module exposing
 import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Ast.Source as AST
 import Compiler.ModuleName as ModuleName exposing (ModuleName)
+import Compiler.PackageName as PackageName exposing (PackageName)
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Space as Space
 import Compiler.Parse.Type as Type
@@ -86,17 +87,17 @@ spaceParser =
 
     String.Parser.run parser Compiler.Parse.Context.empty source
 -}
-parser : Parser Context Error AST.Module
-parser =
+parser : PackageName -> Parser Context Error AST.Module
+parser package =
     -- TODO: post parse verification. Check Haskell-based compiler for details
     Parser.oneOf
-        [ parseSignatureModule
-        , parseImplementationModule
+        [ parseSignatureModule package
+        , parseImplementationModule package
         ]
 
 
-parseSignatureModule : Parser Context Error AST.Module
-parseSignatureModule =
+parseSignatureModule : PackageName -> Parser Context Error AST.Module
+parseSignatureModule package =
     Parser.succeed
         (\name docs imports sigs ->
             let
@@ -108,6 +109,7 @@ parseSignatureModule =
             in
             AST.Signature
                 { name = name
+                , package = package
                 , docs = docs
                 , imports = imports
                 , values = values
@@ -127,8 +129,8 @@ parseSignatureModule =
         |> Parser.keep (Parser.loop [] signatureLoopParser)
 
 
-parseImplementationModule : Parser Context Error AST.Module
-parseImplementationModule =
+parseImplementationModule : PackageName -> Parser Context Error AST.Module
+parseImplementationModule package =
     Parser.succeed
         (\{ name, effects } exports docs requires imports binops decls ->
             let
@@ -146,6 +148,7 @@ parseImplementationModule =
             in
             AST.Implementation
                 { name = name
+                , package = package
                 , exports = exports
                 , docs = docs
                 , requires = requires

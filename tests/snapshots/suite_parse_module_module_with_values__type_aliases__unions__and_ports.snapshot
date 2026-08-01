@@ -245,6 +245,10 @@ Ok
                 }
             , value = ModuleName "MyValues" 
             }
+        , package = PackageName 
+            { author = "example"
+            , name = "package" 
+            }
         , requires = 
             [
             ]
