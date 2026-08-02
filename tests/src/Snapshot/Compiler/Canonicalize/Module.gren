@@ -69,6 +69,28 @@ tests =
                   }
                 ]
                 |> Snapshot.this
+        , test "Reference def in other module with exposed value" <| \_ ->
+            canonicalize
+                [ { package = PackageName.example
+                  , source =
+                    """
+                    module ModuleOne exposing (..)
+
+                    x = 42
+                    """
+                  }
+                , { package = PackageName.example
+                  , source =
+                    """
+                    module ModuleTwo exposing (..)
+
+                    import ModuleOne exposing (x)
+
+                    y = x
+                    """
+                  }
+                ]
+                |> Snapshot.this
         ]
 
 

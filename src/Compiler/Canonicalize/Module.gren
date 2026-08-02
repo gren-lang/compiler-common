@@ -138,94 +138,176 @@ canonicalizeModuleContent pkg canModules parsedModule =
 
 createExpressionContext : PackageName -> Dict String CanonicalAst.Module -> ParseAst.ModuleImplementation -> Expression.Context
 createExpressionContext pkg canModules parsedModule =
+    let
+        topLevelScope =
+            Array.foldl
+                (\val dict ->
+                    Dict.set
+                        val.value.value.name.value
+                        (Expression.Local { position = { start = val.start, end = val.end } })
+                        dict
+                )
+                Dict.empty
+                parsedModule.values
+    in
     { pkg = pkg
     , currentModule = parsedModule.name.value
-    , qualifiedVars =
-        Array.foldl
-            (\mod qv ->
-                let
-                    modName =
-                        mod.module_.value
-
-                    qualifier =
-                        mod.alias
-                            |> Maybe.withDefault modName
-
-                    values =
-                        Dict.get (ModuleName.toString modName) canModules
-                            |> Maybe.map
-                                (\m ->
-                                    let
-                                        normalizedDefs =
-                                            CanonicalAst.flattenDecls m.decls
-                                                |> Array.map
-                                                    (\d ->
-                                                        when d is
-                                                            CanonicalAst.Def { name } ->
-                                                                { name = name.value
-                                                                , module_ = modName
-                                                                , package = m.package
-                                                                , annotation = dummyAnnotation -- TODO
-                                                                }
-
-                                                            CanonicalAst.TypedDef { name } ->
-                                                                { name = name.value
-                                                                , module_ = modName
-                                                                , package = m.package
-                                                                , annotation = dummyAnnotation -- TODO
-                                                                }
-                                                    )
-                                    in
-                                    when m.exports is
-                                        CanonicalAst.ExportEverything _ ->
-                                            normalizedDefs
-
-                                        CanonicalAst.Export exportDict ->
-                                            let
-                                                names =
-                                                    Dict.keys exportDict
-                                            in
-                                            Array.keepIf (\d -> Array.member d.name names) normalizedDefs
-                                )
-                            |> Maybe.withDefault [] -- In theory, this will never happen
-                in
-                -- TODO: What if there are multiple modules of the same name from different packages?
-                Dict.set
-                    (ModuleName.toString modName)
-                    (Array.foldl
-                        (\def acc ->
-                            Dict.set
-                                def.name
-                                { first =
-                                    { module_ = def.module_
-                                    , package = def.package
-                                    , annotation = def.annotation
-                                    }
-                                , rest = []
-                                }
-                                acc
-                        )
-                        Dict.empty
-                        values
-                    )
-                    qv
-            )
-            Dict.empty
-            (Array.map .value parsedModule.imports)
+    , qualifiedVars = extractQualifiedVars canModules parsedModule
     , qualifiedCtors = Dict.empty
-    , scope = 
+    , scope =
         Array.foldl
-            (\val dict ->
-                Dict.set
-                    val.value.value.name.value
-                    (Expression.Local { position = { start = val.start, end = val.end } })
-                    dict
-            )
-            Dict.empty
-            parsedModule.values
+            (extractExposedVals canModules)
+            topLevelScope
+            (Array.map .value parsedModule.imports) -- TODO: de-duplicate
     , scopedCtors = Dict.empty
     , scopedOperators = Dict.empty
     }
+
+
+extractQualifiedVars : Dict String CanonicalAst.Module -> ParseAst.ModuleImplementation -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry))
+extractQualifiedVars canModules parsedModule =
+    Array.foldl
+        (extractQualifiedVarsHelper canModules)
+        Dict.empty
+        (Array.map .value parsedModule.imports)
+
+
+extractQualifiedVarsHelper : Dict String CanonicalAst.Module -> ParseAst.Import -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry)) -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry))
+extractQualifiedVarsHelper canModules mod qv =
+    let
+        modName =
+            mod.module_.value
+
+        qualifier =
+            mod.alias
+                |> Maybe.withDefault modName
+
+        values =
+            Dict.get (ModuleName.toString modName) canModules
+                |> Maybe.map
+                    (\m ->
+                        let
+                            normalizedDefs =
+                                CanonicalAst.flattenDecls m.decls
+                                    |> Array.map
+                                        (\d ->
+                                            when d is
+                                                CanonicalAst.Def { name } ->
+                                                    { name = name.value
+                                                    , module_ = modName
+                                                    , package = m.package
+                                                    , annotation = dummyAnnotation -- TODO
+                                                    }
+
+                                                CanonicalAst.TypedDef { name } ->
+                                                    { name = name.value
+                                                    , module_ = modName
+                                                    , package = m.package
+                                                    , annotation = dummyAnnotation -- TODO
+                                                    }
+                                        )
+                        in
+                        when m.exports is
+                            CanonicalAst.ExportEverything _ ->
+                                normalizedDefs
+
+                            CanonicalAst.Export exportDict ->
+                                let
+                                    names =
+                                        Dict.keys exportDict
+                                in
+                                Array.keepIf (\d -> Array.member d.name names) normalizedDefs
+                    )
+                |> Maybe.withDefault [] -- In theory, this will never happen
+    in
+    -- TODO: What if there are multiple modules of the same name from different packages?
+    Dict.set
+        (ModuleName.toString modName)
+        (Array.foldl
+            (\def acc ->
+                Dict.set
+                    def.name
+                    { first =
+                        { module_ = def.module_
+                        , package = def.package
+                        , annotation = def.annotation
+                        }
+                    , rest = []
+                    }
+                    acc
+            )
+            Dict.empty
+            values
+        )
+        qv
+
+
+extractExposedVals : Dict String CanonicalAst.Module -> ParseAst.Import -> Dict String Expression.ScopeEntry -> Dict String Expression.ScopeEntry
+extractExposedVals canModules mod scope =
+    let
+        modName =
+            mod.module_.value
+
+        values =
+            -- TODO: de-duplicate
+            Dict.get (ModuleName.toString modName) canModules
+                |> Maybe.map
+                    (\m ->
+                        let
+                            normalizedDefs =
+                                CanonicalAst.flattenDecls m.decls
+                                    |> Array.map
+                                        (\d ->
+                                            when d is
+                                                CanonicalAst.Def { name } ->
+                                                    { name = name.value
+                                                    , module_ = modName
+                                                    , package = m.package
+                                                    , annotation = dummyAnnotation -- TODO
+                                                    , position = { start = name.start, end = name.end}
+                                                    }
+
+                                                CanonicalAst.TypedDef { name } ->
+                                                    { name = name.value
+                                                    , module_ = modName
+                                                    , package = m.package
+                                                    , annotation = dummyAnnotation -- TODO
+                                                    -- TODO: add located -> region function
+                                                    , position = { start = name.start, end = name.end}
+                                                    }
+                                        )
+                        in
+                        when m.exports is
+                            CanonicalAst.ExportEverything _ ->
+                                normalizedDefs
+
+                            CanonicalAst.Export exportDict ->
+                                let
+                                    names =
+                                        Dict.keys exportDict
+                                in
+                                Array.keepIf (\d -> Array.member d.name names) normalizedDefs
+                    )
+                |> Maybe.withDefault [] -- In theory, this will never happen
+    in
+    Array.foldl
+        (\def acc ->
+            let
+                entry =
+                    Expression.Imported
+                        { entry = 
+                            { module_ = def.module_
+                            , package = def.package
+                            , annotation = def.annotation
+                            }
+                        , position = def.position
+                        }
+            in
+            -- TODO: what about conflicts?
+            Dict.set def.name entry acc
+        )
+        scope
+        values
 
 
 dummyAnnotation : CanonicalAst.Annotation
