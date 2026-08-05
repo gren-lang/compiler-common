@@ -10,8 +10,15 @@
         "gren make"
       ],
       "test": [
+        "devbox run test:unit",
+        "devbox run test:snapshot"
+      ],
+      "test:unit": [
         "cd tests/",
-        "gren run Main",
+        "gren run Main"
+      ],
+      "test:snapshot": [
+        "cd tests/",
         "gren run SnapshotMain"
       ]
     }

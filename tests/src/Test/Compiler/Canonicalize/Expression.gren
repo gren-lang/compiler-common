@@ -244,6 +244,38 @@ tests =
                 in
                 expectCanonicalizeError context "unknownVar" (Canonicalize.UnknownVar "unknownVar")
             ]
+        , describe "Ctor"
+            [ test "Variable in scope resolves to VarLocal" <| \_ ->
+                let
+                    myTypeCtors =
+                        [ { name = "One"
+                          , index = 0
+                          , arg = Nothing
+                          }
+                        ]
+                
+                    context =
+                        moduleContext "Test"
+                            |> withQualifiedCtors PackageName.example "Test" "MyType" myTypeCtors
+                in
+                expectCanonicalize
+                    context
+                    "One"
+                    ( CanonicalAst.VarCtor
+                        { opts = CanonicalAst.Normal
+                        , home = unsafeModuleName "Test"
+                        , name = "One"
+                        , index = 0
+                        , annotation = dummyAnnotation
+                        }
+                    )
+            , test "Ctor not in scope returns error" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeError context "Unknown" (Canonicalize.UnknownCtor "Unknown")
+            ]
         , describe "Call expressions"
             [ test "Simple function call with local variable" <| \_ ->
                 let
@@ -781,4 +813,80 @@ withScopedOperator : String -> ParseAst.Infix -> Canonicalize.Context -> Canonic
 withScopedOperator modName infix ctx =
     { ctx | scopedOperators =
         Dict.set infix.symbol { moduleName = unsafeModuleName modName, operator = infix } ctx.scopedOperators
+    }
+
+
+withQualifiedCtors : PackageName -> String -> String -> Array CanonicalAst.Ctor -> Canonicalize.Context -> Canonicalize.Context
+withQualifiedCtors pkg mod unionName ctors startingCtx =
+    let
+        union =
+            unionFromCtors unionName ctors
+
+        innerUpdate ctorDef maybeValue =
+            when maybeValue is
+                Just entry ->
+                    Just
+                        { entry | rest = Array.pushLast ctorDef entry.rest }
+
+                Nothing ->
+                    Just
+                        { first = ctorDef
+                        , rest = []
+                        }
+    in
+    Array.indexedFoldl
+        (\idx ctor ctx ->
+            let
+                ctorDef =
+                    qualifiedCtor pkg mod union idx ctor.name ctor.arg
+            in
+            { ctx
+                | scopedCtors =
+                    Dict.update ctor.name (innerUpdate ctorDef) ctx.scopedCtors
+                , qualifiedCtors =
+                    Dict.update
+                        mod
+                        (\maybeMod ->
+                            when maybeMod is
+                                Just existing ->
+                                    Just <| Dict.update ctor.name (innerUpdate ctorDef) ctx.scopedCtors
+
+                                Nothing ->
+                                    Just <| Dict.singleton ctor.name { first = ctorDef, rest = [] }
+                        )
+                        ctx.qualifiedCtors
+            }
+        )
+        startingCtx
+        ctors
+
+
+unionFromCtors : String -> Array CanonicalAst.Ctor -> CanonicalAst.Union
+unionFromCtors name ctors =
+    { name = name
+    , vars =
+        ctors
+            |> Array.mapAndKeepJust .arg
+            |> Array.mapAndKeepJust
+                (\argType ->
+                    when argType is
+                        CanonicalAst.TVar n ->
+                            Just n
+
+                        _ ->
+                            Nothing
+                )
+    , alts = ctors
+    , opts = CanonicalAst.Normal
+    }
+
+
+qualifiedCtor : PackageName -> String -> CanonicalAst.Union -> Int -> String -> Maybe CanonicalAst.Type -> Canonicalize.QualifiedCtor
+qualifiedCtor pkg moduleNameStr union ctorIdx ctorName argType =
+    { module_ = unsafeModuleName moduleNameStr
+    , package = pkg
+    , union = union
+    , index = ctorIdx
+    , name = ctorName
+    , argType = argType
     }

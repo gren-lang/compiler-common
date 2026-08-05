@@ -296,7 +296,8 @@ type alias Binop =
 
 
 type alias Union =
-  { vars : Array String
+  { name : String
+  , vars : Array String
   , alts : Array Ctor
   , opts : CtorOpts -- CACHE which optimizations are available
   }

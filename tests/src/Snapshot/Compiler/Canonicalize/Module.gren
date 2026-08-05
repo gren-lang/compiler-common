@@ -91,6 +91,22 @@ tests =
                   }
                 ]
                 |> Snapshot.this
+        , test "Custom types" <| \_ ->
+            canonicalize
+                [ { package = PackageName.example
+                  , source =
+                    """
+                    module MyModule exposing (..)
+
+                    type Maybe a
+                        = Just a
+                        | Nothing
+
+                    x = Just 42
+                    """
+                  }
+                ]
+                |> Snapshot.this
         ]
 
 

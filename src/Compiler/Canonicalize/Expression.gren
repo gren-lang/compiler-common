@@ -77,7 +77,6 @@ type alias QualifiedEntry =
 type alias QualifiedCtor =
      { module_ : ModuleName
      , package : PackageName
-     , unionName : String
      , union : CanonicalAst.Union
      , name : String
      , index : Int
@@ -180,8 +179,7 @@ canonicalize_ context expr =
                     Nothing ->
                         Err (ModuleNotFound qualifier)
 
-        ParseAst.Var { name } ->
-            -- Handle unqualified names from scope (locals, imports, top-level)
+        ParseAst.Var { varType = ParseAst.LowVar, name } ->
             when Dict.get name context.scope is
                 Just (Local localEntry) ->
                     Ok (CanonicalAst.VarLocal name)
@@ -208,6 +206,31 @@ canonicalize_ context expr =
 
                 Nothing ->
                     Err (UnknownVar name)
+
+        ParseAst.Var { varType = ParseAst.CapVar, name } ->
+            when Dict.get name context.scopedCtors is
+                Just { first = ctor, rest = [] } ->
+                    Ok
+                        ( CanonicalAst.VarCtor
+                            { opts = ctor.union.opts
+                            , home = ctor.module_
+                            , name = ctor.name
+                            , index = ctor.index
+                            , annotation = -- TODO
+                                { freeVars = Set.fromArray []
+                                , tipe = CanonicalAst.TVar "a"
+                                }
+                            }
+                        )
+
+                Just _ ->
+                    Err <| AmbiguousVar
+                        { name = name
+                        , modules = [] -- TODO
+                        }
+
+                Nothing ->
+                    Err (UnknownCtor name)
 
         ParseAst.Call { fn, args } ->
             let
@@ -724,7 +747,7 @@ canonicalizeCtor context pat ctorName maybeArg ctorDict =
                     , home = ctor.module_
                     , index = ctor.index
                     , name = ctor.name
-                    , tipe = ctor.unionName -- TODO
+                    , tipe = ctor.union.name -- TODO
                     , union = ctor.union
                     }
             in

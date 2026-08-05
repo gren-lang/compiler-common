@@ -87,7 +87,6 @@ canonicalizeModule pkg parsedModules modules recursionStack sourceModule =
 
 
 {-| Canonicalize module content (Implementation only).
-For now, only handles Implementation modules with a single value definition.
 -}
 canonicalizeModuleContent : PackageName -> Dict String CanonicalAst.Module -> SourceModule -> Result Error CanonicalAst.Module
 canonicalizeModuleContent pkg canModules parsedModule =
@@ -103,12 +102,67 @@ canonicalizeModuleContent pkg canModules parsedModule =
                 effectsResult =
                     canonicalizeEffects impl.effects
 
+                unionResult =
+                    Array.foldl
+                        (\union acc ->
+                            Result.andThen
+                                (\unions ->
+                                    canonicalizeUnion context union.value.value
+                                        |> Result.map
+                                            (\u ->
+                                                Dict.set
+                                                    union.value.value.name.value
+                                                    u
+                                                    unions
+                                            )
+                                )
+                                acc
+                        )
+                        (Ok Dict.empty)
+                        impl.unions
+
+                contextWithUnions =
+                    unionResult
+                        |> Result.map
+                            (\us ->
+                                Dict.values us
+                                    |> Array.foldl
+                                        (\union acc ->
+                                            Array.foldl
+                                                (\variant acc2 ->
+                                                    Dict.set
+                                                        variant.name
+                                                        { first =
+                                                             { module_ = impl.name.value
+                                                             , package = impl.package
+                                                             , union = union
+                                                             , name = variant.name
+                                                             , index = variant.index
+                                                             , argType = variant.arg
+                                                             }
+                                                        -- TODO: what about collisions?
+                                                        , rest = []
+                                                        }
+                                                        acc2
+                                                )
+                                                acc
+                                                union.alts
+                                        )
+                                        Dict.empty
+                            )
+                        |> Result.map
+                            (\ctors ->
+                                { context | scopedCtors = ctors }
+                            )
+                        -- TODO: swallows error
+                        |> Result.withDefault context
+
                 decsResult =
                     Array.foldl
                         (\decl declsResult ->
                             Result.andThen
                                 (\decls ->
-                                    canonicalizeDef context decl.value.value
+                                    canonicalizeDef contextWithUnions decl.value.value
                                         |> Result.map (\d -> CanonicalAst.Declare { def = d, decls = decls })
                                 )
                                 declsResult
@@ -116,21 +170,22 @@ canonicalizeModuleContent pkg canModules parsedModule =
                         (Ok CanonicalAst.SaveTheEnvironment)
                         impl.values
             in
-            Result.map3
-                (\canonicalExports canonicalEffects canDecls ->
+            Ok
+                (\canonicalExports canonicalEffects canUnions canDecls ->
                     { name = impl.name.value
                     , package = impl.package
                     , exports = canonicalExports
                     , decls = canDecls
-                    , unions = Dict.empty
+                    , unions = canUnions
                     , aliases = Dict.empty
                     , binops = Dict.empty
                     , effects = canonicalEffects
                     }
                 )
-                exportsResult
-                effectsResult
-                decsResult
+                |> Result.andMap exportsResult
+                |> Result.andMap effectsResult
+                |> Result.andMap unionResult
+                |> Result.andMap decsResult
 
         ParseAst.Signature _ ->
             Err PlaceholderError
@@ -329,8 +384,38 @@ canonicalizeExports exposings region =
             Err PlaceholderError
 
 
+{-| Canonicalize a single union
+-}
+canonicalizeUnion : Expression.Context -> ParseAst.Union -> Result Error CanonicalAst.Union
+canonicalizeUnion context value =
+    Ok
+        { name = value.name.value
+        , vars = Array.map .value value.vars
+        , alts =
+            Array.indexedMap
+                (\idx { value = variant } ->
+                    { name = variant.name.value
+                    , index = idx
+                    -- TODO: canonicalize types
+                    , arg = Nothing
+                    }
+                )
+                value.variants
+        , opts =
+            when value.variants is
+                [ { value = { payload = Just _ } } ] ->
+                    CanonicalAst.Unbox
+
+                _ ->
+                    if Array.any (\var -> var.value.payload /= Nothing ) value.variants then
+                        CanonicalAst.Normal
+
+                    else
+                        CanonicalAst.Enum
+        }
+
+
 {-| Canonicalize a single definition (value).
-For now, only handles simple definitions without type signatures.
 -}
 canonicalizeDef : Expression.Context -> ParseAst.Value -> Result Error CanonicalAst.Def
 canonicalizeDef context value =

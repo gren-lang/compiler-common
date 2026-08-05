@@ -294,7 +294,7 @@ tests =
                             Expect.equal
                               { home = unsafeModuleName "MyType"
                               , tipe = "MyType"
-                              , union = unionFromCtors myTypeCtors
+                              , union = unionFromCtors "MyType" myTypeCtors
                               , name = "MyCtor"
                               , index = 0
                               , arg = Nothing
@@ -337,7 +337,7 @@ tests =
                             Expect.equal
                               { home = unsafeModuleName "MyType"
                               , tipe = "MyType"
-                              , union = unionFromCtors myTypeCtors
+                              , union = unionFromCtors "MyType" myTypeCtors
                               , name = "MyCtor"
                               , index = 0
                               , arg =
@@ -350,7 +350,7 @@ tests =
                                             (CanonicalAst.PCtor
                                                 { home = unsafeModuleName "OtherType"
                                                 , tipe = "OtherType"
-                                                , union = unionFromCtors otherTypeCtors
+                                                , union = unionFromCtors "OtherType" otherTypeCtors
                                                 , name = "First"
                                                 , index = 0
                                                 , arg = Nothing
@@ -381,7 +381,7 @@ tests =
                             Expect.equal
                               { home = unsafeModuleName "MyType"
                               , tipe = "MyType"
-                              , union = unionFromCtors myTypeCtors
+                              , union = unionFromCtors "MyType" myTypeCtors
                               , name = "MyCtor"
                               , index = 0
                               , arg = Nothing
@@ -738,11 +738,10 @@ qualifiedEntry pkg moduleNameStr annotation =
     }
 
 
-qualifiedCtor : PackageName -> String -> String -> CanonicalAst.Union -> Int -> String -> Maybe CanonicalAst.Type -> Canonicalize.QualifiedCtor
-qualifiedCtor pkg moduleNameStr unionName union ctorIdx ctorName argType =
+qualifiedCtor : PackageName -> String -> CanonicalAst.Union -> Int -> String -> Maybe CanonicalAst.Type -> Canonicalize.QualifiedCtor
+qualifiedCtor pkg moduleNameStr union ctorIdx ctorName argType =
     { module_ = unsafeModuleName moduleNameStr
     , package = pkg
-    , unionName = unionName
     , union = union
     , index = ctorIdx
     , name = ctorName
@@ -789,7 +788,7 @@ withQualifiedCtors : PackageName -> String -> String -> Array CanonicalAst.Ctor 
 withQualifiedCtors pkg mod unionName ctors startingCtx =
     let
         union =
-            unionFromCtors ctors
+            unionFromCtors unionName ctors
 
         innerUpdate ctorDef maybeValue =
             when maybeValue is
@@ -807,7 +806,7 @@ withQualifiedCtors pkg mod unionName ctors startingCtx =
         (\idx ctor ctx ->
             let
                 ctorDef =
-                    qualifiedCtor pkg mod unionName union idx ctor.name ctor.arg
+                    qualifiedCtor pkg mod union idx ctor.name ctor.arg
             in
             { ctx
                 | scopedCtors =
@@ -830,9 +829,10 @@ withQualifiedCtors pkg mod unionName ctors startingCtx =
         ctors
 
 
-unionFromCtors : Array CanonicalAst.Ctor -> CanonicalAst.Union
-unionFromCtors ctors =
-    { vars =
+unionFromCtors : String -> Array CanonicalAst.Ctor -> CanonicalAst.Union
+unionFromCtors name ctors =
+    { name = name
+    , vars =
         ctors
             |> Array.mapAndKeepJust .arg
             |> Array.mapAndKeepJust
