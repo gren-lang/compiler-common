@@ -242,7 +242,7 @@ type Type
     , vars : Array Type
     }
   | TRecord
-    { fields : Dict String FieldType
+    { fields : Dict String Type
     , alias : Maybe String
     }
   | TAlias
@@ -256,15 +256,6 @@ type Type
 type AliasType
   = Holey Type
   | Filled Type
-
-
--- NOTE: The Int marks the source order, but it may not be available
--- for every canonical type. For example, if the canonical type is inferred
--- the orders will all be zeros.
-type alias FieldType =
-    { sourceOrder : Int
-    , tipe : Type
-    }
 
 
 -- MODULES
@@ -283,7 +274,7 @@ type alias Module =
 
 
 type alias Alias =
-    { names : String
+    { vars : Array String
     , tipe : Type
     }
 

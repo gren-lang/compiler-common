@@ -102,6 +102,27 @@ canonicalizeModuleContent pkg canModules parsedModule =
                 effectsResult =
                     canonicalizeEffects impl.effects
 
+                typeAliasResult =
+                    Array.foldl
+                        (\alias acc ->
+                            Result.andThen
+                                (\canAliases ->
+                                    Result.map
+                                        (\canTipe ->
+                                            Dict.set
+                                                alias.value.value.name.value
+                                                { vars = Array.map .value alias.value.value.vars
+                                                , tipe = canTipe
+                                                }
+                                                canAliases
+                                        )
+                                        (canonicalizeType alias.value.value.type_)
+                                )
+                                acc
+                        )
+                        (Ok Dict.empty)
+                        impl.aliases
+
                 unionResult =
                     Array.foldl
                         (\union acc ->
@@ -171,19 +192,20 @@ canonicalizeModuleContent pkg canModules parsedModule =
                         impl.values
             in
             Ok
-                (\canonicalExports canonicalEffects canUnions canDecls ->
+                (\canonicalExports canonicalEffects canAlias canUnions canDecls ->
                     { name = impl.name.value
                     , package = impl.package
                     , exports = canonicalExports
                     , decls = canDecls
                     , unions = canUnions
-                    , aliases = Dict.empty
+                    , aliases = canAlias
                     , binops = Dict.empty
                     , effects = canonicalEffects
                     }
                 )
                 |> Result.andMap exportsResult
                 |> Result.andMap effectsResult
+                |> Result.andMap typeAliasResult
                 |> Result.andMap unionResult
                 |> Result.andMap decsResult
 
@@ -526,3 +548,55 @@ getModuleDependencies mod =
 
         ParseAst.Signature _ ->
             []
+
+
+canonicalizeType : ParseAst.Type -> Result Error CanonicalAst.Type
+canonicalizeType tipe =
+    when tipe.value is
+        ParseAst.TLambda lambda ->
+            Result.map2
+                (\from to -> CanonicalAst.TLambda { from = from, to = to })
+                (canonicalizeType lambda.from)
+                (canonicalizeType lambda.to)
+
+        ParseAst.TVar name ->
+            Ok (CanonicalAst.TVar name)
+
+        ParseAst.TType { name, args } ->
+            Err PlaceholderError
+
+        ParseAst.TTypeQual { varRegion, qualifier, name, args } ->
+            Err PlaceholderError
+
+        ParseAst.TRecord { fields, extending } ->
+            let
+                canFieldResult =
+                    Array.foldl
+                        (\field acc ->
+                            Result.andThen
+                                (\canFields ->
+                                    canonicalizeType field.signature
+                                        |> Result.map
+                                            (\canField ->
+                                                Dict.set
+                                                    field.field.value
+                                                    canField
+                                                    canFields
+                                            )
+                                )
+                                acc
+                        )
+                        (Ok Dict.empty)
+                        fields
+            in
+            Result.map
+                (\canFields ->
+                    CanonicalAst.TRecord
+                        { fields = canFields
+                        , alias = Maybe.map .value extending
+                        }
+                )
+                canFieldResult
+
+        ParseAst.TParens pTipe ->
+            canonicalizeType pTipe

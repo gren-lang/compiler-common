@@ -107,6 +107,19 @@ tests =
                   }
                 ]
                 |> Snapshot.this
+        , test "Type aliases" <| \_ ->
+            canonicalize
+                [ { package = PackageName.example
+                  , source =
+                    """
+                    module MyModule exposing (..)
+
+                    type alias Person = { name : str }
+                    """
+                  }
+                ]
+                |> Snapshot.this
+        -- TODO: BINOPS
         ]
 
 
