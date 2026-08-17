@@ -119,7 +119,22 @@ tests =
                   }
                 ]
                 |> Snapshot.this
-        -- TODO: BINOPS
+        , test "Binops" <| \_ ->
+            canonicalize
+                [ { package = PackageName.example
+                  , source =
+                    """
+                    module Math exposing (..)
+
+                    infix left 6 (+) = add
+
+                    add a b = 0
+
+                    unrelated = 5 + 10 + 15
+                    """
+                  }
+                ]
+                |> Snapshot.this
         ]
 
 

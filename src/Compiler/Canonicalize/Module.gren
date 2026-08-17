@@ -93,6 +93,24 @@ canonicalizeModuleContent pkg canModules parsedModule =
     when parsedModule.ast is
         ParseAst.Implementation impl ->
             let
+                canBinops =
+                    Array.foldl
+                        (\bin acc ->
+                            let
+                                binOp =
+                                    bin.value
+                            in
+                            Dict.set
+                                binOp.symbol
+                                { name = binOp.fn
+                                , associativity = binOp.associativity
+                                , precedence = binOp.precedence
+                                }
+                                acc
+                        )
+                        Dict.empty
+                        impl.binops
+
                 context =
                     createExpressionContext pkg canModules impl
 
@@ -190,6 +208,7 @@ canonicalizeModuleContent pkg canModules parsedModule =
                         )
                         (Ok CanonicalAst.SaveTheEnvironment)
                         impl.values
+
             in
             Ok
                 (\canonicalExports canonicalEffects canAlias canUnions canDecls ->
@@ -199,7 +218,7 @@ canonicalizeModuleContent pkg canModules parsedModule =
                     , decls = canDecls
                     , unions = canUnions
                     , aliases = canAlias
-                    , binops = Dict.empty
+                    , binops = canBinops
                     , effects = canonicalEffects
                     }
                 )
@@ -237,7 +256,14 @@ createExpressionContext pkg canModules parsedModule =
             topLevelScope
             (Array.map .value parsedModule.imports) -- TODO: de-duplicate
     , scopedCtors = Dict.empty
-    , scopedOperators = Dict.empty
+    , scopedOperators =
+        parsedModule.binops
+            |> Array.map .value
+            |> Array.foldl
+                (\infix acc ->
+                    Dict.set infix.symbol { moduleName = parsedModule.name.value, operator = infix } acc
+                )
+                Dict.empty
     }
 
 

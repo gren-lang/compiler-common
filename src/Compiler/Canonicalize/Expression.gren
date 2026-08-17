@@ -602,10 +602,14 @@ toBinopStep makeBinop rootOp segments final =
             else
                 when { root = rootOp.operator.associativity, current = operator.operator.associativity } is
                     { root = ParseAst.OpALeft, current = ParseAst.OpALeft } ->
-                        toBinopStep (\right -> toBinop operator (makeBinop expression) right) operator rest final
+                        -- Compiler Bug! (\right -> toBinop operator (makeBinop expression) right)
+                        toBinopStep (toBinop operator (makeBinop expression)) operator rest final
 
                     { root = ParseAst.OpARight, current = ParseAst.OpARight } ->
-                        toBinopStep (\right -> makeBinop (toBinop operator expression right)) operator rest final
+                        -- Compiler Bug! (\right -> makeBinop (toBinop operator expression right))
+                        -- In both cases above, makeBinop ends up being a self-reference due to how the compiler
+                        -- optimizes tail-calls and because of how `var` works
+                        toBinopStep (makeBinop << toBinop operator expression) operator rest final
 
                     _ ->
                         BS_Error { left = rootOp, right = operator }

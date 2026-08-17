@@ -1,0 +1,185 @@
+Ok 
+    (Dict.fromArray 
+        [
+            { key = "Math"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                        { key = "+"
+                        , value = 
+                            { associativity = OpALeft
+                            , name = "add"
+                            , precedence = 6 
+                            } 
+                        }
+                    ]
+                , decls = Declare 
+                    { decls = Declare 
+                        { decls = SaveTheEnvironment
+                        , def = Def 
+                            { body = 
+                                { end = 
+                                    { col = 12
+                                    , row = 5 
+                                    }
+                                , start = 
+                                    { col = 11
+                                    , row = 5 
+                                    }
+                                , value = Int 0 
+                                }
+                            , name = 
+                                { end = 
+                                    { col = 4
+                                    , row = 5 
+                                    }
+                                , start = 
+                                    { col = 1
+                                    , row = 5 
+                                    }
+                                , value = "add" 
+                                }
+                            , params = 
+                                [
+                                    { end = 
+                                        { col = 8
+                                        , row = 5 
+                                        }
+                                    , start = 
+                                        { col = 7
+                                        , row = 5 
+                                        }
+                                    , value = PVar "b" 
+                                    }
+                                , 
+                                    { end = 
+                                        { col = 6
+                                        , row = 5 
+                                        }
+                                    , start = 
+                                        { col = 5
+                                        , row = 5 
+                                        }
+                                    , value = PVar "a" 
+                                    }
+                                ] 
+                            } 
+                        }
+                    , def = Def 
+                        { body = 
+                            { end = 
+                                { col = 24
+                                , row = 7 
+                                }
+                            , start = 
+                                { col = 13
+                                , row = 7 
+                                }
+                            , value = Binop 
+                                { annotation = 
+                                    { freeVars = Set.fromArray 
+                                        [
+                                        ]
+                                    , tipe = TVar "a" 
+                                    }
+                                , home = ModuleName "Math"
+                                , left = 
+                                    { end = 
+                                        { col = 19
+                                        , row = 7 
+                                        }
+                                    , start = 
+                                        { col = 13
+                                        , row = 7 
+                                        }
+                                    , value = Binop 
+                                        { annotation = 
+                                            { freeVars = Set.fromArray 
+                                                [
+                                                ]
+                                            , tipe = TVar "a" 
+                                            }
+                                        , home = ModuleName "Math"
+                                        , left = 
+                                            { end = 
+                                                { col = 14
+                                                , row = 7 
+                                                }
+                                            , start = 
+                                                { col = 13
+                                                , row = 7 
+                                                }
+                                            , value = Int 5 
+                                            }
+                                        , realName = "add"
+                                        , right = 
+                                            { end = 
+                                                { col = 19
+                                                , row = 7 
+                                                }
+                                            , start = 
+                                                { col = 17
+                                                , row = 7 
+                                                }
+                                            , value = Int 10 
+                                            }
+                                        , symbol = "+" 
+                                        } 
+                                    }
+                                , realName = "add"
+                                , right = 
+                                    { end = 
+                                        { col = 24
+                                        , row = 7 
+                                        }
+                                    , start = 
+                                        { col = 22
+                                        , row = 7 
+                                        }
+                                    , value = Int 15 
+                                    }
+                                , symbol = "+" 
+                                } 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 10
+                                , row = 7 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 7 
+                                }
+                            , value = "unrelated" 
+                            }
+                        , params = 
+                            [
+                            ] 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 12
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Math"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        ]
+    )
