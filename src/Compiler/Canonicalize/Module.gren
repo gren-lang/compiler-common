@@ -316,12 +316,6 @@ canonicalizeModuleContent realName pkg parsedModule context =
                 (\canonicalExports canonicalEffects canAlias canUnions canDecls ->
                     { name = realName
                     , package = impl.package
-                    , requires =
-                        Array.mapAndKeepJust
-                            (\r ->
-                                Dict.get (ModuleName.toString r.value.module_.value) context.signatures
-                            )
-                            impl.requires
                     , exports = canonicalExports
                     , decls = canDecls
                     , unions = canUnions

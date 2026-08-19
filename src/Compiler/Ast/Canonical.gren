@@ -272,7 +272,6 @@ type alias Signature =
 type alias Module =
   { name : ModuleName
   , package : PackageName
-  , requires : Array Signature
   , exports : Exports
   , decls : Decls
   , unions : Dict String Union

@@ -55,9 +55,6 @@ Ok
                     { author = "example"
                     , name = "package" 
                     }
-                , requires = 
-                    [
-                    ]
                 , unions = Dict.fromArray 
                     [
                     ] 
@@ -121,9 +118,6 @@ Ok
                     { author = "example"
                     , name = "package" 
                     }
-                , requires = 
-                    [
-                    ]
                 , unions = Dict.fromArray 
                     [
                     ] 

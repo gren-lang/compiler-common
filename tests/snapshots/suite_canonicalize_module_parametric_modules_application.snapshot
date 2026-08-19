@@ -58,9 +58,6 @@ Ok
                     { author = "example"
                     , name = "package" 
                     }
-                , requires = 
-                    [
-                    ]
                 , unions = Dict.fromArray 
                     [
                     ] 
@@ -124,47 +121,6 @@ Ok
                     { author = "example"
                     , name = "package" 
                     }
-                , requires = 
-                    [
-                        { name = ModuleName "Equatable"
-                        , package = PackageName 
-                            { author = "example"
-                            , name = "package" 
-                            }
-                        , typeNames = 
-                            ["T"
-                            ]
-                        , values = Dict.fromArray 
-                            [
-                                { key = "equals"
-                                , value = TLambda 
-                                    { from = TType 
-                                        { home = ModuleName "Equatable"
-                                        , name = "T"
-                                        , vars = 
-                                            [
-                                            ] 
-                                        }
-                                    , to = TLambda 
-                                        { from = TType 
-                                            { home = ModuleName "Equatable"
-                                            , name = "T"
-                                            , vars = 
-                                                [
-                                                ] 
-                                            }
-                                        , to = TRecord 
-                                            { alias = Nothing
-                                            , fields = Dict.fromArray 
-                                                [
-                                                ] 
-                                            } 
-                                        } 
-                                    } 
-                                }
-                            ] 
-                        }
-                    ]
                 , unions = Dict.fromArray 
                     [
                     ] 
@@ -228,9 +184,6 @@ Ok
                     { author = "example"
                     , name = "package" 
                     }
-                , requires = 
-                    [
-                    ]
                 , unions = Dict.fromArray 
                     [
                     ] 
@@ -327,9 +280,6 @@ Ok
                     { author = "example"
                     , name = "package" 
                     }
-                , requires = 
-                    [
-                    ]
                 , unions = Dict.fromArray 
                     [
                     ] 
