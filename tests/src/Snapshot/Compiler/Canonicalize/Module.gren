@@ -1,6 +1,6 @@
 module Snapshot.Compiler.Canonicalize.Module exposing (tests)
 
-import Snapshot exposing (test)
+import Snapshot exposing (describe, test)
 import String.Parser.Advanced as Parser
 import Compiler.Canonicalize.Module as Canonicalize exposing (SourceModule, Error(..))
 import Compiler.Ast.Source as ParseAst
@@ -20,121 +20,129 @@ import String.Parser.Advanced as Parser
 
 tests : Snapshot.Test
 tests =
-    Snapshot.describe "Canonicalize.Module"
-        [ test "Single def" <| \_ ->
-            canonicalize
-                [ { package = PackageName.example
-                  , source =
-                    """
-                    module MyModule exposing (..)
+    describe "Canonicalize.Module"
+        [ describe "Values"
+            [ test "Single" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
 
-                    x = 42
-                    """
-                  }
-                ]
-                |> Snapshot.this
-        , test "Multiple defs" <| \_ ->
-            canonicalize
-                [ { package = PackageName.example
-                  , source =
-                    """
-                    module MyBigModule exposing (..)
+                        x = 42
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            , test "Multiple" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyBigModule exposing (..)
 
-                    x = 42
+                        x = 42
 
-                    y = x
-                    """
-                  }
-                ]
-                |> Snapshot.this
-        , test "Reference def in other module" <| \_ ->
-            canonicalize
-                [ { package = PackageName.example
-                  , source =
-                    """
-                    module ModuleOne exposing (..)
+                        y = x
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            , test "Reference to other module" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module ModuleOne exposing (..)
 
-                    x = 42
-                    """
-                  }
-                , { package = PackageName.example
-                  , source =
-                    """
-                    module ModuleTwo exposing (..)
+                        x = 42
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module ModuleTwo exposing (..)
 
-                    import ModuleOne
+                        import ModuleOne
 
-                    y = ModuleOne.x
-                    """
-                  }
-                ]
-                |> Snapshot.this
-        , test "Reference def in other module with exposed value" <| \_ ->
-            canonicalize
-                [ { package = PackageName.example
-                  , source =
-                    """
-                    module ModuleOne exposing (..)
+                        y = ModuleOne.x
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            , test "Reference exposed value in other module" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module ModuleOne exposing (..)
 
-                    x = 42
-                    """
-                  }
-                , { package = PackageName.example
-                  , source =
-                    """
-                    module ModuleTwo exposing (..)
+                        x = 42
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module ModuleTwo exposing (..)
 
-                    import ModuleOne exposing (x)
+                        import ModuleOne exposing (x)
 
-                    y = x
-                    """
-                  }
-                ]
-                |> Snapshot.this
-        , test "Custom types" <| \_ ->
-            canonicalize
-                [ { package = PackageName.example
-                  , source =
-                    """
-                    module MyModule exposing (..)
+                        y = x
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            ]
+        , describe "Custom types"
+            [ test "Intra module" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
 
-                    type Maybe a
-                        = Just a
-                        | Nothing
+                        type Maybe a
+                            = Just a
+                            | Nothing
 
-                    x = Just 42
-                    """
-                  }
-                ]
-                |> Snapshot.this
-        , test "Type aliases" <| \_ ->
-            canonicalize
-                [ { package = PackageName.example
-                  , source =
-                    """
-                    module MyModule exposing (..)
+                        x = Just 42
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            ]
+        , describe "Type aliases"
+            [ test "Intra module" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
 
-                    type alias Person = { name : str }
-                    """
-                  }
-                ]
-                |> Snapshot.this
-        , test "Binops" <| \_ ->
-            canonicalize
-                [ { package = PackageName.example
-                  , source =
-                    """
-                    module Math exposing (..)
+                        type alias Person = { name : str }
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            ]
+        , describe "Binops"
+            [ test "Intra module" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module Math exposing (..)
 
-                    infix left 6 (+) = add
+                        infix left 6 (+) = add
 
-                    add a b = 0
+                        add a b = 0
 
-                    unrelated = 5 + 10 + 15
-                    """
-                  }
-                ]
-                |> Snapshot.this
+                        unrelated = 5 + 10 + 15
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            ]
         ]
 
 
