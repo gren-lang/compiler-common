@@ -143,10 +143,36 @@ tests =
                     ]
                     |> Snapshot.this
             ]
+        , describe "Parametric modules"
+            [ test "Declaration" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        signature module Equatable
+
+                        type T
+
+                        equals : T -> T -> {}
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module EqualsDelegate exposing (isEqual)
+
+                        requires Equatable
+
+                        isEqual = Equatable.equals
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            ]
         ]
 
 
-canonicalize : Array { package : PackageName, source : String } -> Result (Array String) (Dict String CanonicalAst.Module)
+canonicalize : Array { package : PackageName, source : String } -> Result (Array String) Canonicalize.Context
 canonicalize sources =
     sources
         |> Array.map parseModule
@@ -174,9 +200,9 @@ parseModule mod =
             Err <| ModParser.errorsToString mod.source errs
 
 
-canonicalizeModules : Dict String Canonicalize.SourceModule -> Result (Array String) (Dict String CanonicalAst.Module)
+canonicalizeModules : Dict String Canonicalize.SourceModule -> Result (Array String) Canonicalize.Context
 canonicalizeModules parsedMods =
-    when Canonicalize.canonicalize PackageName.example parsedMods Dict.empty is
+    when Canonicalize.canonicalize PackageName.example parsedMods Canonicalize.emptyContext is
         Err canErrs ->
             Err [ Debug.toString canErrs ]
 

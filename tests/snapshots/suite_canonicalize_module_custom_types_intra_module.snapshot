@@ -1,5 +1,5 @@
 Ok 
-    (Dict.fromArray 
+    { modules = Dict.fromArray 
         [
             { key = "MyModule"
             , value = 
@@ -91,6 +91,9 @@ Ok
                     { author = "example"
                     , name = "package" 
                     }
+                , requires = 
+                    [
+                    ]
                 , unions = Dict.fromArray 
                     [
                         { key = "Maybe"
@@ -118,4 +121,7 @@ Ok
                 } 
             }
         ]
-    )
+    , signatures = Dict.fromArray 
+        [
+        ] 
+    }
