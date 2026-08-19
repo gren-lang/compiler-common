@@ -437,7 +437,7 @@ requireLoopParser imps =
                     , expose = AST.Explicit []
                     }
             )
-            |> Parser.skip (Parser.token "require "(ExpectedKeyword "require"))
+            |> Parser.skip (Parser.keyword "require" (ExpectedKeyword "require"))
             |> Parser.skip spaceParser
             |> Parser.keep moduleNameParser
             |> Parser.skip spaceParser
@@ -454,7 +454,7 @@ requireLoopParser imps =
                                         }
                                 }
                             )
-                            |> Parser.skip (Parser.token "as" (ExpectedKeyword "as"))
+                            |> Parser.skip (Parser.keyword "as" (ExpectedKeyword "as"))
                             |> Parser.skip spaceParser
                             |> Parser.keep moduleNameParser
                             |> Parser.skip spaceParser

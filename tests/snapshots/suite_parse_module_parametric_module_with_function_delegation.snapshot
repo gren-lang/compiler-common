@@ -1,0 +1,110 @@
+Ok 
+    (Implementation 
+        { aliases = 
+            [
+            ]
+        , binops = 
+            [
+            ]
+        , docs = Nothing
+        , effects = NoEffects
+        , exports = Open
+        , imports = 
+            [
+            ]
+        , name = 
+            { end = 
+                { col = 16
+                , row = 1 
+                }
+            , start = 
+                { col = 8
+                , row = 1 
+                }
+            , value = ModuleName "Delegate" 
+            }
+        , package = PackageName 
+            { author = "example"
+            , name = "package" 
+            }
+        , requires = 
+            [
+                { end = 
+                    { col = 17
+                    , row = 3 
+                    }
+                , start = 
+                    { col = 1
+                    , row = 3 
+                    }
+                , value = 
+                    { alias = Nothing
+                    , expose = Explicit 
+                        [
+                        ]
+                    , module_ = 
+                        { end = 
+                            { col = 17
+                            , row = 3 
+                            }
+                        , start = 
+                            { col = 9
+                            , row = 3 
+                            }
+                        , value = ModuleName "Constant" 
+                        } 
+                    } 
+                }
+            ]
+        , unions = 
+            [
+            ]
+        , values = 
+            [
+                { end = 
+                    { col = 22
+                    , row = 5 
+                    }
+                , start = 
+                    { col = 1
+                    , row = 5 
+                    }
+                , value = 
+                    { docs = Nothing
+                    , value = 
+                        { args = 
+                            [
+                            ]
+                        , body = 
+                            { end = 
+                                { col = 22
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 7
+                                , row = 5 
+                                }
+                            , value = VarQual 
+                                { name = "number"
+                                , qualifier = "Constant"
+                                , varType = LowVar 
+                                } 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 4
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 5 
+                                }
+                            , value = "num" 
+                            }
+                        , signature = Nothing 
+                        } 
+                    } 
+                }
+            ] 
+        }
+    )

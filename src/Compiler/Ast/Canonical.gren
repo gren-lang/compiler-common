@@ -241,15 +241,15 @@ type Type
     , name : String
     , vars : Array Type
     }
-  | TRecord
-    { fields : Dict String Type
-    , alias : Maybe String
-    }
   | TAlias
     { home : ModuleName
     , name : String
     , fields : Array { name : String, tipe : Type }
     , aliasTipe : AliasType
+    }
+  | TRecord
+    { fields : Dict String Type
+    , alias : Maybe String
     }
 
 
@@ -262,7 +262,11 @@ type AliasType
 
 
 type alias Signature =
-  {}
+  { name : ModuleName
+  , package : PackageName
+  , typeNames : Array String
+  , values : Dict String Type
+  }
 
 
 type alias Module =

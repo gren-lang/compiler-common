@@ -122,7 +122,7 @@ canonicalizeDependencies pkg parsedModules context recursionStack ast =
                                 pkg
                                 parsedModules
                                 newContext
-                                (Set.set depNameStr recursionStack)
+                                recursionStack
                                 parsedDep
 
                         Nothing ->
@@ -201,7 +201,7 @@ canonicalizeModuleContent pkg parsedModule context =
                                                 }
                                                 canAliases
                                         )
-                                        (canonicalizeType alias.value.value.type_)
+                                        (canonicalizeType Dict.empty alias.value.value.type_)
                                 )
                                 acc
                         )
@@ -278,10 +278,15 @@ canonicalizeModuleContent pkg parsedModule context =
 
             in
             Ok
-                (\canonicalExports canonicalEffects canAlias canUnions canDecls canSignatures ->
+                (\canonicalExports canonicalEffects canAlias canUnions canDecls ->
                     { name = impl.name.value
                     , package = impl.package
-                    , requires = canSignatures
+                    , requires =
+                        Array.mapAndKeepJust
+                            (\r ->
+                                Dict.get (ModuleName.toString r.value.module_.value) context.signatures
+                            )
+                            impl.requires
                     , exports = canonicalExports
                     , decls = canDecls
                     , unions = canUnions
@@ -295,14 +300,65 @@ canonicalizeModuleContent pkg parsedModule context =
                 |> Result.andMap typeAliasResult
                 |> Result.andMap unionResult
                 |> Result.andMap decsResult
-                |> Result.andMap (Ok [])
                 |> Result.map
                     (\newModule ->
                         { context | modules = Dict.set (ModuleName.toString newModule.name) newModule context.modules }
                     )
 
-        ParseAst.Signature _ ->
-            Err PlaceholderError
+        ParseAst.Signature sig ->
+            let
+                typeNames =
+                    Array.map (\v -> v.value.value.name.value) sig.types
+
+                localTypes =
+                    Array.foldl
+                        (\name dict ->
+                            Dict.set
+                                name
+                                (CanonicalAst.TType
+                                    { home = sig.name.value
+                                    , name = name
+                                    , vars = []
+                                    }
+                                )
+                                dict
+                        )
+                        Dict.empty
+                        typeNames
+
+                canResult =
+                    Array.foldl
+                        (\value accResult ->
+                            Result.andThen
+                                (\acc ->
+                                    canonicalizeType localTypes value.value.value.signature
+                                        |> Result.map
+                                            (\t ->
+                                                Dict.set
+                                                    value.value.value.name.value
+                                                    t
+                                                    acc
+                                            )
+                                )
+                                accResult
+                        )
+                        (Ok Dict.empty)
+                        sig.values
+
+            in
+            Result.map
+                (\canValues ->
+                    let
+                        sigModule =
+                            { name = sig.name.value
+                            , package = sig.package
+                            , typeNames = typeNames
+                            , values = canValues
+                            }
+                    in
+                    { context | signatures = Dict.set (ModuleName.toString sig.name.value) sigModule context.signatures }
+                )
+                canResult
 
 
 createExpressionContext : PackageName -> Context -> ParseAst.ModuleImplementation -> Expression.Context
@@ -318,10 +374,22 @@ createExpressionContext pkg moduleContext parsedModule =
                 )
                 Dict.empty
                 parsedModule.values
+
+        qualifiedVarsFromImplementations =
+            Array.foldl
+                (extractQualifiedVarsImplHelper moduleContext.modules)
+                Dict.empty
+                (Array.map .value parsedModule.imports)
+
+        qualifiedVars =
+            Array.foldl
+                (extractQualifiedVarsSigHelper moduleContext.signatures)
+                qualifiedVarsFromImplementations
+                (Array.map .value parsedModule.requires)
     in
     { pkg = pkg
     , currentModule = parsedModule.name.value
-    , qualifiedVars = extractQualifiedVars moduleContext.modules parsedModule
+    , qualifiedVars = qualifiedVars
     , qualifiedCtors = Dict.empty
     , scope =
         Array.foldl
@@ -340,16 +408,8 @@ createExpressionContext pkg moduleContext parsedModule =
     }
 
 
-extractQualifiedVars : Dict String CanonicalAst.Module -> ParseAst.ModuleImplementation -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry))
-extractQualifiedVars canModules parsedModule =
-    Array.foldl
-        (extractQualifiedVarsHelper canModules)
-        Dict.empty
-        (Array.map .value parsedModule.imports)
-
-
-extractQualifiedVarsHelper : Dict String CanonicalAst.Module -> ParseAst.Import -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry)) -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry))
-extractQualifiedVarsHelper canModules mod qv =
+extractQualifiedVarsImplHelper : Dict String CanonicalAst.Module -> ParseAst.Import -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry)) -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry))
+extractQualifiedVarsImplHelper canModules mod qv =
     let
         modName =
             mod.module_.value
@@ -393,6 +453,57 @@ extractQualifiedVarsHelper canModules mod qv =
                                         Dict.keys exportDict
                                 in
                                 Array.keepIf (\d -> Array.member d.name names) normalizedDefs
+                    )
+                |> Maybe.withDefault [] -- In theory, this will never happen
+    in
+    -- TODO: What if there are multiple modules of the same name from different packages?
+    Dict.set
+        (ModuleName.toString modName)
+        (Array.foldl
+            (\def acc ->
+                Dict.set
+                    def.name
+                    { first =
+                        { module_ = def.module_
+                        , package = def.package
+                        , annotation = def.annotation
+                        }
+                    , rest = []
+                    }
+                    acc
+            )
+            Dict.empty
+            values
+        )
+        qv
+
+
+extractQualifiedVarsSigHelper : Dict String CanonicalAst.Signature -> ParseAst.Require -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry)) -> Dict String (Dict String (Expression.OneOrMore Expression.QualifiedEntry))
+extractQualifiedVarsSigHelper canSignatures mod qv =
+    let
+        modName =
+            mod.module_.value
+
+        qualifier =
+            mod.alias
+                |> Maybe.withDefault modName
+
+        values =
+            Dict.get (ModuleName.toString modName) canSignatures
+                |> Maybe.map
+                    (\m ->
+                        Dict.foldl
+                            (\name value acc ->
+                                Array.pushLast
+                                    { name = name
+                                    , module_ = modName
+                                    , package = m.package
+                                    , annotation = dummyAnnotation -- TODO
+                                    }
+                                    acc
+                            )
+                            []
+                            m.values
                     )
                 |> Maybe.withDefault [] -- In theory, this will never happen
     in
@@ -583,20 +694,25 @@ canonicalizeEffects effects =
 
 
 
-canonicalizeType : ParseAst.Type -> Result Error CanonicalAst.Type
-canonicalizeType tipe =
+canonicalizeType : Dict String CanonicalAst.Type -> ParseAst.Type -> Result Error CanonicalAst.Type
+canonicalizeType recognizedTypes tipe =
     when tipe.value is
         ParseAst.TLambda lambda ->
             Result.map2
                 (\from to -> CanonicalAst.TLambda { from = from, to = to })
-                (canonicalizeType lambda.from)
-                (canonicalizeType lambda.to)
+                (canonicalizeType recognizedTypes lambda.from)
+                (canonicalizeType recognizedTypes lambda.to)
 
         ParseAst.TVar name ->
             Ok (CanonicalAst.TVar name)
 
         ParseAst.TType { name, args } ->
-            Err PlaceholderError
+            when Dict.get name.value recognizedTypes is
+                Just t ->
+                    Ok t
+
+                Nothing ->
+                    Err PlaceholderError
 
         ParseAst.TTypeQual { varRegion, qualifier, name, args } ->
             Err PlaceholderError
@@ -608,7 +724,7 @@ canonicalizeType tipe =
                         (\field acc ->
                             Result.andThen
                                 (\canFields ->
-                                    canonicalizeType field.signature
+                                    canonicalizeType recognizedTypes field.signature
                                         |> Result.map
                                             (\canField ->
                                                 Dict.set
@@ -632,4 +748,4 @@ canonicalizeType tipe =
                 canFieldResult
 
         ParseAst.TParens pTipe ->
-            canonicalizeType pTipe
+            canonicalizeType recognizedTypes pTipe

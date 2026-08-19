@@ -16,6 +16,7 @@ import Compiler.Parse.Context as Context exposing (Context)
 import Compiler.Parse.Number as Number
 import Dict exposing (Dict)
 import String.Parser.Advanced as Parser
+import Test.Runner.Effectful as Effectful
 
 
 tests : Snapshot.Test
@@ -159,9 +160,9 @@ tests =
                     , { package = PackageName.example
                       , source =
                         """
-                        module EqualsDelegate exposing (isEqual)
+                        module EqualsDelegate exposing (..)
 
-                        requires Equatable
+                        require Equatable
 
                         isEqual = Equatable.equals
                         """

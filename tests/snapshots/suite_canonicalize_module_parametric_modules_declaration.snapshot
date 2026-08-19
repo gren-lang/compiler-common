@@ -1,3 +1,152 @@
-Err 
-    ["ExpressionError (UnknownCtor \"Equatable\")"
-    ]
+Ok 
+    { modules = Dict.fromArray 
+        [
+            { key = "EqualsDelegate"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = Declare 
+                    { decls = SaveTheEnvironment
+                    , def = Def 
+                        { body = 
+                            { end = 
+                                { col = 27
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 11
+                                , row = 5 
+                                }
+                            , value = VarTopLevel 
+                                { home = ModuleName "Equatable"
+                                , name = "equals" 
+                                } 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 8
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 5 
+                                }
+                            , value = "isEqual" 
+                            }
+                        , params = 
+                            [
+                            ] 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 22
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "EqualsDelegate"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , requires = 
+                    [
+                        { name = ModuleName "Equatable"
+                        , package = PackageName 
+                            { author = "example"
+                            , name = "package" 
+                            }
+                        , typeNames = 
+                            ["T"
+                            ]
+                        , values = Dict.fromArray 
+                            [
+                                { key = "equals"
+                                , value = TLambda 
+                                    { from = TType 
+                                        { home = ModuleName "Equatable"
+                                        , name = "T"
+                                        , vars = 
+                                            [
+                                            ] 
+                                        }
+                                    , to = TLambda 
+                                        { from = TType 
+                                            { home = ModuleName "Equatable"
+                                            , name = "T"
+                                            , vars = 
+                                                [
+                                                ] 
+                                            }
+                                        , to = TRecord 
+                                            { alias = Nothing
+                                            , fields = Dict.fromArray 
+                                                [
+                                                ] 
+                                            } 
+                                        } 
+                                    } 
+                                }
+                            ] 
+                        }
+                    ]
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        ]
+    , signatures = Dict.fromArray 
+        [
+            { key = "Equatable"
+            , value = 
+                { name = ModuleName "Equatable"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , typeNames = 
+                    ["T"
+                    ]
+                , values = Dict.fromArray 
+                    [
+                        { key = "equals"
+                        , value = TLambda 
+                            { from = TType 
+                                { home = ModuleName "Equatable"
+                                , name = "T"
+                                , vars = 
+                                    [
+                                    ] 
+                                }
+                            , to = TLambda 
+                                { from = TType 
+                                    { home = ModuleName "Equatable"
+                                    , name = "T"
+                                    , vars = 
+                                        [
+                                        ] 
+                                    }
+                                , to = TRecord 
+                                    { alias = Nothing
+                                    , fields = Dict.fromArray 
+                                        [
+                                        ] 
+                                    } 
+                                } 
+                            } 
+                        }
+                    ] 
+                } 
+            }
+        ] 
+    }

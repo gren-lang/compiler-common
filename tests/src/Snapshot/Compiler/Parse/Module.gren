@@ -190,6 +190,16 @@ tests =
                  compare : T -> T -> Basics.Order
                  """
                  |> Snapshot.this
+         , test "Parametric module with function delegation" <| \_ ->
+            parse
+                 """
+                 module Delegate exposing (..)
+
+                 require Constant
+
+                 num = Constant.number
+                 """
+                 |> Snapshot.this
         ]
 
 
