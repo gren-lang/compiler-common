@@ -9,34 +9,43 @@ import Compiler.ModuleName as ModuleName
 tests : Test
 tests =
     describe "ModuleName"
-        [ describe "fromString"
-            [ test "valid name" <| \{} ->
-                ModuleName.fromString "MyModule"
-                    |> Maybe.map ModuleName.toString
-                    |> Maybe.withDefault ""
-                    |> Expect.equal "MyModule"
-            , test "valid nested name" <| \{} ->
-                ModuleName.fromString "My.Nested.Module"
-                    |> Maybe.map ModuleName.toString
-                    |> Maybe.withDefault ""
-                    |> Expect.equal "My.Nested.Module"
-            , test "name must be capitalized" <| \{} ->
-                ModuleName.fromString "myModule"
-                    |> Expect.equal Nothing
-            , test "name cannot contain whitespace" <| \{} ->
-                ModuleName.fromString "My Module"
-                    |> Expect.equal Nothing
-            , test "name cannot start with digit" <| \{} ->
-                ModuleName.fromString "9Modules"
-                    |> Expect.equal Nothing
-            , test "nested name must be capitalized" <| \{} ->
-                ModuleName.fromString "My.module"
-                    |> Expect.equal Nothing
-            , test "nested name cannot contain whitespace" <| \{} ->
-                ModuleName.fromString "My. Module"
-                    |> Expect.equal Nothing
-            , test "nested name cannot start with digit" <| \{} ->
-                ModuleName.fromString "My.9odule"
-                    |> Expect.equal Nothing
-            ]
+        [ test "valid name" <| \{} ->
+            ModuleName.fromString "MyModule"
+                |> Maybe.map ModuleName.toString
+                |> Maybe.withDefault ""
+                |> Expect.equal "MyModule"
+        , test "valid nested name" <| \{} ->
+            ModuleName.fromString "My.Nested.Module"
+                |> Maybe.map ModuleName.toString
+                |> Maybe.withDefault ""
+                |> Expect.equal "My.Nested.Module"
+        , test "name must be capitalized" <| \{} ->
+            ModuleName.fromString "myModule"
+                |> Expect.equal Nothing
+        , test "name cannot contain whitespace" <| \{} ->
+            ModuleName.fromString "My Module"
+                |> Expect.equal Nothing
+        , test "name cannot start with digit" <| \{} ->
+            ModuleName.fromString "9Modules"
+                |> Expect.equal Nothing
+        , test "nested name must be capitalized" <| \{} ->
+            ModuleName.fromString "My.module"
+                |> Expect.equal Nothing
+        , test "nested name cannot contain whitespace" <| \{} ->
+            ModuleName.fromString "My. Module"
+                |> Expect.equal Nothing
+        , test "nested name cannot start with digit" <| \{} ->
+            ModuleName.fromString "My.9odule"
+                |> Expect.equal Nothing
+        , test "Cannot contain $" <| \{} ->
+            ModuleName.fromString "My$9odule"
+                |> Expect.equal Nothing
+        , test "withParam" <| \{} ->
+            Maybe.map2
+                (\first second -> ModuleName.withParameter second first)
+                (ModuleName.fromString "Test")
+                (ModuleName.fromString "Param")
+                |> Maybe.map (ModuleName.toString)
+                |> Maybe.withDefault "Invalid"
+                |> Expect.equal "Test$$Param"
         ]

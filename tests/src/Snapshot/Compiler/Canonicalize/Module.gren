@@ -169,6 +169,50 @@ tests =
                       }
                     ]
                     |> Snapshot.this
+            , test "Application" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        signature module Equatable
+
+                        type T
+
+                        equals : T -> T -> {}
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module EqualsDelegate exposing (..)
+
+                        require Equatable as E
+
+                        isEqual = E.equals
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module MyType exposing (..)
+
+                        type alias T = {}
+
+                        equals l r = {}
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module Application exposing (..)
+
+                        import EqualsDelegate MyType as MyEquals
+
+                        isEqual = MyEquals.isEqual
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
             ]
         ]
 

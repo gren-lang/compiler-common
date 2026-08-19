@@ -1,0 +1,383 @@
+Ok 
+    { modules = Dict.fromArray 
+        [
+            { key = "Application"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = Declare 
+                    { decls = SaveTheEnvironment
+                    , def = Def 
+                        { body = 
+                            { end = 
+                                { col = 27
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 11
+                                , row = 5 
+                                }
+                            , value = VarTopLevel 
+                                { home = ModuleName "EqualsDelegate"
+                                , name = "isEqual" 
+                                } 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 8
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 5 
+                                }
+                            , value = "isEqual" 
+                            }
+                        , params = 
+                            [
+                            ] 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 19
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Application"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , requires = 
+                    [
+                    ]
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        , 
+            { key = "EqualsDelegate"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = Declare 
+                    { decls = SaveTheEnvironment
+                    , def = Def 
+                        { body = 
+                            { end = 
+                                { col = 19
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 11
+                                , row = 5 
+                                }
+                            , value = VarTopLevel 
+                                { home = ModuleName "Equatable"
+                                , name = "equals" 
+                                } 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 8
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 5 
+                                }
+                            , value = "isEqual" 
+                            }
+                        , params = 
+                            [
+                            ] 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 22
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "EqualsDelegate"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , requires = 
+                    [
+                        { name = ModuleName "Equatable"
+                        , package = PackageName 
+                            { author = "example"
+                            , name = "package" 
+                            }
+                        , typeNames = 
+                            ["T"
+                            ]
+                        , values = Dict.fromArray 
+                            [
+                                { key = "equals"
+                                , value = TLambda 
+                                    { from = TType 
+                                        { home = ModuleName "Equatable"
+                                        , name = "T"
+                                        , vars = 
+                                            [
+                                            ] 
+                                        }
+                                    , to = TLambda 
+                                        { from = TType 
+                                            { home = ModuleName "Equatable"
+                                            , name = "T"
+                                            , vars = 
+                                                [
+                                                ] 
+                                            }
+                                        , to = TRecord 
+                                            { alias = Nothing
+                                            , fields = Dict.fromArray 
+                                                [
+                                                ] 
+                                            } 
+                                        } 
+                                    } 
+                                }
+                            ] 
+                        }
+                    ]
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        , 
+            { key = "EqualsDelegate$$MyType"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = Declare 
+                    { decls = SaveTheEnvironment
+                    , def = Def 
+                        { body = 
+                            { end = 
+                                { col = 19
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 11
+                                , row = 5 
+                                }
+                            , value = VarTopLevel 
+                                { home = ModuleName "MyType"
+                                , name = "equals" 
+                                } 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 8
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 5 
+                                }
+                            , value = "isEqual" 
+                            }
+                        , params = 
+                            [
+                            ] 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 22
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "EqualsDelegate$$MyType"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , requires = 
+                    [
+                    ]
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        , 
+            { key = "MyType"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                        { key = "T"
+                        , value = 
+                            { tipe = TRecord 
+                                { alias = Nothing
+                                , fields = Dict.fromArray 
+                                    [
+                                    ] 
+                                }
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = Declare 
+                    { decls = SaveTheEnvironment
+                    , def = Def 
+                        { body = 
+                            { end = 
+                                { col = 16
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 14
+                                , row = 5 
+                                }
+                            , value = Record 
+                                [
+                                ] 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 7
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 5 
+                                }
+                            , value = "equals" 
+                            }
+                        , params = 
+                            [
+                                { end = 
+                                    { col = 11
+                                    , row = 5 
+                                    }
+                                , start = 
+                                    { col = 10
+                                    , row = 5 
+                                    }
+                                , value = PVar "r" 
+                                }
+                            , 
+                                { end = 
+                                    { col = 9
+                                    , row = 5 
+                                    }
+                                , start = 
+                                    { col = 8
+                                    , row = 5 
+                                    }
+                                , value = PVar "l" 
+                                }
+                            ] 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 14
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "MyType"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , requires = 
+                    [
+                    ]
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        ]
+    , signatures = Dict.fromArray 
+        [
+            { key = "Equatable"
+            , value = 
+                { name = ModuleName "Equatable"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , typeNames = 
+                    ["T"
+                    ]
+                , values = Dict.fromArray 
+                    [
+                        { key = "equals"
+                        , value = TLambda 
+                            { from = TType 
+                                { home = ModuleName "Equatable"
+                                , name = "T"
+                                , vars = 
+                                    [
+                                    ] 
+                                }
+                            , to = TLambda 
+                                { from = TType 
+                                    { home = ModuleName "Equatable"
+                                    , name = "T"
+                                    , vars = 
+                                        [
+                                        ] 
+                                    }
+                                , to = TRecord 
+                                    { alias = Nothing
+                                    , fields = Dict.fromArray 
+                                        [
+                                        ] 
+                                    } 
+                                } 
+                            } 
+                        }
+                    ] 
+                } 
+            }
+        ] 
+    }

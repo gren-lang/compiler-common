@@ -53,7 +53,7 @@ canonicalize pkg parsedModules context =
         (\key parsedModule resultAcc ->
             Result.andThen
                 (\contextAcc ->
-                    canonicalizeModule pkg parsedModules contextAcc Set.empty parsedModule
+                    canonicalizeModule pkg parsedModules contextAcc Set.empty parsedModule []
                 )
                 resultAcc
         )
@@ -69,11 +69,15 @@ canonicalizeModule :
     Context ->
     Set String ->
     SourceModule ->
+    Array ModuleName ->
     Result Error Context
-canonicalizeModule pkg parsedModules context recursionStack sourceModule =
+canonicalizeModule pkg parsedModules context recursionStack sourceModule args =
     let
         modName =
-            (ParseAst.moduleName sourceModule.ast).value
+            Array.foldl
+                ModuleName.withParameter
+                (ParseAst.moduleName sourceModule.ast).value
+                args
 
         modNameString =
             ModuleName.toString modName
@@ -88,9 +92,18 @@ canonicalizeModule pkg parsedModules context recursionStack sourceModule =
         let
             newStack =
                 Set.set modNameString recursionStack
+
+            appliedModule =
+                when args is
+                    [] ->
+                        sourceModule
+
+                    _ ->
+                        -- TODO: verify module signatures
+                        applyModuleParameters args sourceModule
         in
-        canonicalizeDependencies pkg parsedModules context newStack sourceModule.ast
-            |> Result.andThen (canonicalizeModuleContent pkg sourceModule)
+        canonicalizeDependencies pkg parsedModules context newStack appliedModule.ast
+            |> Result.andThen (canonicalizeModuleContent modName pkg appliedModule)
 
 
 {-| Canonicalize dependencies of a module.
@@ -109,12 +122,12 @@ canonicalizeDependencies pkg parsedModules context recursionStack ast =
             getModuleDependencies ast
     in
     Array.foldl
-        (\depName accResult ->
+        (\dep accResult ->
             Result.andThen
                 (\newContext ->
                     let
                         depNameStr =
-                            ModuleName.toString depName
+                            ModuleName.toString dep.name
                     in
                     when Dict.get depNameStr parsedModules is
                         Just parsedDep ->
@@ -124,9 +137,10 @@ canonicalizeDependencies pkg parsedModules context recursionStack ast =
                                 newContext
                                 recursionStack
                                 parsedDep
+                                dep.args
 
                         Nothing ->
-                            Err (ModuleNotFound depName)
+                            Err (ModuleNotFound dep.name)
                 )
                 accResult
         )
@@ -136,27 +150,48 @@ canonicalizeDependencies pkg parsedModules context recursionStack ast =
 
 {-| Extract all module dependencies from requires and imports.
 -}
-getModuleDependencies : ParseAst.Module -> Array ModuleName
+getModuleDependencies : ParseAst.Module -> Array { name : ModuleName, args : Array ModuleName }
 getModuleDependencies mod =
     when mod is
         ParseAst.Implementation impl ->
             let
                 reqNames =
-                    Array.map (\reqLoc -> reqLoc.value.module_.value) impl.requires
+                    Array.map
+                        (\reqLoc -> { name = reqLoc.value.module_.value, args = [] })
+                        impl.requires
 
                 impNames =
-                    Array.map (\impLoc -> impLoc.value.module_.value) impl.imports
+                    Array.mapAndFlatten
+                        (\reqLoc ->
+                            when reqLoc.value.args is
+                                [] ->
+                                    [ { name = reqLoc.value.module_.value, args = [] } ]
+
+                                filled ->
+                                    (Array.map
+                                        (\arg ->
+                                            { name = arg.value, args = [] }
+                                        )
+                                        filled
+                                    ) ++
+                                    [ { name = reqLoc.value.module_.value, args = [] }
+                                    , { name = reqLoc.value.module_.value, args = Array.map .value filled }
+                                    ]
+                                
+                        )
+                        impl.imports
             in
             Array.append reqNames impNames
 
         ParseAst.Signature _ ->
+            -- TODO
             []
 
 
-{-| Canonicalize module content (Implementation only).
+{-| Canonicalize module content.
 -}
-canonicalizeModuleContent : PackageName -> SourceModule -> Context -> Result Error Context
-canonicalizeModuleContent pkg parsedModule context =
+canonicalizeModuleContent : ModuleName -> PackageName -> SourceModule -> Context -> Result Error Context
+canonicalizeModuleContent realName pkg parsedModule context =
     when parsedModule.ast is
         ParseAst.Implementation impl ->
             let
@@ -239,7 +274,7 @@ canonicalizeModuleContent pkg parsedModule context =
                                                     Dict.set
                                                         variant.name
                                                         { first =
-                                                             { module_ = impl.name.value
+                                                             { module_ = realName
                                                              , package = impl.package
                                                              , union = union
                                                              , name = variant.name
@@ -279,7 +314,7 @@ canonicalizeModuleContent pkg parsedModule context =
             in
             Ok
                 (\canonicalExports canonicalEffects canAlias canUnions canDecls ->
-                    { name = impl.name.value
+                    { name = realName
                     , package = impl.package
                     , requires =
                         Array.mapAndKeepJust
@@ -458,7 +493,7 @@ extractQualifiedVarsImplHelper canModules mod qv =
     in
     -- TODO: What if there are multiple modules of the same name from different packages?
     Dict.set
-        (ModuleName.toString modName)
+        (ModuleName.toString qualifier)
         (Array.foldl
             (\def acc ->
                 Dict.set
@@ -509,7 +544,7 @@ extractQualifiedVarsSigHelper canSignatures mod qv =
     in
     -- TODO: What if there are multiple modules of the same name from different packages?
     Dict.set
-        (ModuleName.toString modName)
+        (ModuleName.toString qualifier)
         (Array.foldl
             (\def acc ->
                 Dict.set
@@ -749,3 +784,50 @@ canonicalizeType recognizedTypes tipe =
 
         ParseAst.TParens pTipe ->
             canonicalizeType recognizedTypes pTipe
+
+
+-- APPLY MODULE PARAMS
+
+
+applyModuleParameters : Array ModuleName -> SourceModule -> SourceModule
+applyModuleParameters args sourceModule =
+    when sourceModule.ast is
+        ParseAst.Signature _ ->
+            -- TODO: shouldn't happen
+            sourceModule
+
+        ParseAst.Implementation impl ->
+            let
+                newImports =
+                    Array.map2
+                        (\arg req ->
+                            let
+                                argNameLength =
+                                    ModuleName.toString arg
+                                        |> String.count
+                            in
+                            SourcePosition.at
+                                req.start
+                                req.end
+                                { module_ =
+                                    SourcePosition.at
+                                        req.value.module_.start
+                                        { req.value.module_.start
+                                            | col = req.value.module_.start.col + argNameLength
+                                        }
+                                        arg
+                                , args = []
+                                , alias = req.value.alias
+                                , expose = req.value.expose
+                                }
+                        )
+                        args
+                        impl.requires
+            in
+            { package = sourceModule.package
+            , ast = ParseAst.Implementation
+                { impl
+                    | requires = []
+                    , imports = newImports ++ impl.imports
+                }
+            }

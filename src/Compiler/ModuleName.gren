@@ -1,5 +1,6 @@
 module Compiler.ModuleName exposing
     ( ModuleName
+    , withParameter
     , fromString
     , jsonDecoder
     , toString
@@ -52,6 +53,21 @@ fromString str =
 
     else
         Nothing
+
+
+{-| Combines two [ModuleName](#ModuleName)s to represent that the first is a parameter of the second.
+
+    Maybe.map2
+        (\first second -> ModuleName.withParameter second first)
+        (ModuleName.fromString "Test")
+        (ModuleName.fromString "Param")
+        |> Maybe.map (ModuleName.toString)
+        |> Maybe.withDefault "Invalid"
+        == "Test$$Param"
+-}
+withParameter : ModuleName -> ModuleName -> ModuleName
+withParameter (ModuleName param) (ModuleName base) =
+    ModuleName (base ++ "$$" ++ param)
 
 
 {-| JSON Decoder for [ModuleName](#ModuleName).
