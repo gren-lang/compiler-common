@@ -111,6 +111,31 @@ tests =
                       }
                     ]
                     |> Snapshot.this
+            , test "Exposed" <| \_ ->
+                -- TODO: errors (only type is exposed, not exposed)
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
+
+                        type Maybe a
+                            = Just a
+                            | Nothing
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module Main exposing (..)
+
+                        import MyModule exposing (..)
+
+                        x = Just 5
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
             ]
         , describe "Type aliases"
             [ test "Intra module" <| \_ ->

@@ -293,7 +293,8 @@ canonicalizeModuleContent realName pkg parsedModule context =
                             )
                         |> Result.map
                             (\ctors ->
-                                { expressionContext | scopedCtors = ctors }
+                                -- TODO: What about collisions?
+                                { expressionContext | scopedCtors = Dict.union ctors expressionContext.scopedCtors }
                             )
                         -- TODO: swallows error
                         |> Result.withDefault expressionContext
@@ -415,6 +416,47 @@ createExpressionContext pkg moduleContext parsedModule =
                 (extractQualifiedVarsSigHelper moduleContext.signatures)
                 qualifiedVarsFromImplementations
                 (Array.map .value parsedModule.requires)
+
+        scopedCtorsFromImports =
+            Array.foldl
+                (\val dict ->
+                    when Dict.get (ModuleName.toString val.value.module_.value) moduleContext.modules is
+                        Nothing ->
+                            dict
+
+                        Just canMod ->
+                            when canMod.exports is
+                                CanonicalAst.Export _ ->
+                                    dict
+
+                                CanonicalAst.ExportEverything _ ->
+                                    Dict.foldl
+                                        (\_ union acc ->
+                                            Array.foldl
+                                                (\variant acc2 ->
+                                                    Dict.set
+                                                        variant.name
+                                                        { first =
+                                                             { module_ = canMod.name
+                                                             , package = canMod.package
+                                                             , union = union
+                                                             , name = variant.name
+                                                             , index = variant.index
+                                                             , argType = variant.arg
+                                                             }
+                                                        -- TODO: what about collisions?
+                                                        , rest = []
+                                                        }
+                                                        acc2
+                                                )
+                                                acc
+                                                union.alts
+                                        )
+                                        dict
+                                        canMod.unions
+                )
+                Dict.empty
+                parsedModule.imports
     in
     { pkg = pkg
     , currentModule = parsedModule.name.value
@@ -425,7 +467,7 @@ createExpressionContext pkg moduleContext parsedModule =
             (extractExposedVals moduleContext.modules)
             topLevelScope
             (Array.map .value parsedModule.imports) -- TODO: de-duplicate
-    , scopedCtors = Dict.empty
+    , scopedCtors = scopedCtorsFromImports
     , scopedOperators =
         parsedModule.binops
             |> Array.map .value

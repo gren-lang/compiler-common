@@ -1,0 +1,155 @@
+Ok 
+    { modules = Dict.fromArray 
+        [
+            { key = "Main"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = Declare 
+                    { decls = SaveTheEnvironment
+                    , def = Def 
+                        { body = 
+                            { end = 
+                                { col = 11
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 5
+                                , row = 5 
+                                }
+                            , value = Call 
+                                { args = 
+                                    [
+                                        { end = 
+                                            { col = 11
+                                            , row = 5 
+                                            }
+                                        , start = 
+                                            { col = 10
+                                            , row = 5 
+                                            }
+                                        , value = Int 5 
+                                        }
+                                    ]
+                                , fn = 
+                                    { end = 
+                                        { col = 9
+                                        , row = 5 
+                                        }
+                                    , start = 
+                                        { col = 5
+                                        , row = 5 
+                                        }
+                                    , value = VarCtor 
+                                        { annotation = 
+                                            { freeVars = Set.fromArray 
+                                                [
+                                                ]
+                                            , tipe = TVar "a" 
+                                            }
+                                        , home = ModuleName "MyModule"
+                                        , index = 0
+                                        , name = "Just"
+                                        , opts = Normal 
+                                        } 
+                                    } 
+                                } 
+                            }
+                        , name = 
+                            { end = 
+                                { col = 2
+                                , row = 5 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 5 
+                                }
+                            , value = "x" 
+                            }
+                        , params = 
+                            [
+                            ] 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 12
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Main"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        , 
+            { key = "MyModule"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 16
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "MyModule"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                        { key = "Maybe"
+                        , value = 
+                            { alts = 
+                                [
+                                    { arg = Nothing
+                                    , index = 0
+                                    , name = "Just" 
+                                    }
+                                , 
+                                    { arg = Nothing
+                                    , index = 1
+                                    , name = "Nothing" 
+                                    }
+                                ]
+                            , name = "Maybe"
+                            , opts = Normal
+                            , vars = 
+                                ["a"
+                                ] 
+                            } 
+                        }
+                    ] 
+                } 
+            }
+        ]
+    , signatures = Dict.fromArray 
+        [
+        ] 
+    }
