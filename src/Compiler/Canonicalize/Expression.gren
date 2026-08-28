@@ -48,7 +48,7 @@ type alias Context =
     -- Dict <qualifier> (Dict <name> entry)
     , qualifiedVars : Dict String (Dict String (OneOrMore QualifiedEntry))
     , qualifiedCtors : Dict String (Dict String (OneOrMore QualifiedCtor))
-    -- Dict <possible qualified ref> ctor
+    -- Dict <name> entry
     , scope : Dict String ScopeEntry
     , scopedCtors : Dict String (OneOrMore QualifiedCtor)
     , scopedOperators : Dict String { moduleName : ModuleName, operator : ParseAst.Infix }
@@ -332,24 +332,20 @@ canonicalize_ context expr =
                     Result.andThen
                         (\canonicalDefs ->
                             -- Canonicalize body with extended scope
-                            Result.andThen
+                            Result.map
                                 (\canonicalBody ->
-                                    if Array.length canonicalDefs == 1 then
-                                        when Array.get 0 canonicalDefs is
-                                            Just singleDef ->
-                                                Ok (CanonicalAst.Let
-                                                    { def = singleDef
-                                                    , body = canonicalBody
-                                                    }
-                                                )
-                                            Nothing ->
-                                                Err PlaceholderError
-                                    else
-                                        Ok (CanonicalAst.LetRec
-                                            { defs = canonicalDefs
-                                            , body = canonicalBody
-                                            }
-                                        )
+                                    when canonicalDefs is
+                                        [ singleDef ] ->
+                                            CanonicalAst.Let
+                                                { def = singleDef
+                                                , body = canonicalBody
+                                                }
+
+                                        _ ->
+                                            CanonicalAst.LetRec
+                                                { defs = canonicalDefs
+                                                , body = canonicalBody
+                                                }
                                 )
                                 (canonicalize extendedContext body)
                         )
@@ -558,17 +554,14 @@ runBinopStepper step =
     BS_Done expr ->
       Ok expr
 
-    BS_More { segments = [], final } ->
-      Ok final
-
     BS_More { segments, final } ->
         when Array.popFirst segments is
             Just { first, rest } ->
                 runBinopStepper <|
                     toBinopStep (toBinop first.operator first.expression) first.operator rest final
 
-            _ ->
-                Err PlaceholderError
+            Nothing ->
+                Ok final
 
     BS_Error { left, right } ->
       Err PlaceholderError
