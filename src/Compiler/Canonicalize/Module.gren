@@ -222,6 +222,43 @@ canonicalizeModuleContent realName pkg parsedModule context =
                 effectsResult =
                     canonicalizeEffects impl.effects
 
+                externalAliases =
+                    Array.foldl
+                        (\{ value = imp } dict ->
+                            when Dict.get (ModuleName.toString imp.module_.value) context.modules is
+                                Nothing ->
+                                    dict
+
+                                Just canMod ->
+                                    when canMod.exports is
+                                        CanonicalAst.Export _ ->
+                                            -- TODO: common code for handling exports
+                                            dict
+
+                                        CanonicalAst.ExportEverything _ ->
+                                            -- TODO: duplicates?
+                                            canMod.aliases
+                                                |> Dict.map
+                                                    (\name ali ->
+                                                        CanonicalAst.TAlias
+                                                            { home = canMod.name
+                                                            , name = name
+                                                            , fields =
+                                                                ali.vars
+                                                                    |> Array.map
+                                                                        (\var ->
+                                                                            { name = var
+                                                                            , tipe = CanonicalAst.TVar var
+                                                                            }
+                                                                        )
+                                                            , aliasTipe = CanonicalAst.Holey ali.tipe
+                                                            }
+                                                    )
+                                                |> Dict.union dict
+                        )
+                        Dict.empty
+                        impl.imports
+
                 typeAliasResult =
                     Array.foldl
                         (\alias acc ->
@@ -236,7 +273,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                                 }
                                                 canAliases
                                         )
-                                        (canonicalizeType Dict.empty alias.value.value.type_)
+                                        (canonicalizeType externalAliases alias.value.value.type_)
                                 )
                                 acc
                         )
