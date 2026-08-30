@@ -9,6 +9,7 @@ module Compiler.Canonicalize.Module exposing
 import Compiler.Ast.Source as ParseAst
 import Compiler.Ast.Canonical as CanonicalAst
 import Compiler.Canonicalize.Expression as Expression
+import Compiler.Canonicalize.ScopedEntries as ScopedEntries exposing (ScopedEntries)
 import Compiler.PackageName as PackageName exposing (PackageName)
 import Compiler.ModuleName as ModuleName exposing (ModuleName)
 import Compiler.SourcePosition as SourcePosition
@@ -224,39 +225,61 @@ canonicalizeModuleContent realName pkg parsedModule context =
 
                 externalAliases =
                     Array.foldl
-                        (\{ value = imp } dict ->
+                        (\{ value = imp } endScope ->
                             when Dict.get (ModuleName.toString imp.module_.value) context.modules is
                                 Nothing ->
-                                    dict
+                                    endScope
 
                                 Just canMod ->
-                                    when canMod.exports is
-                                        CanonicalAst.Export _ ->
-                                            -- TODO: common code for handling exports
-                                            dict
+                                    let
+                                        aliases =
+                                            Dict.foldl
+                                                (\name ali acc ->
+                                                    Array.pushLast
+                                                        { home = canMod.name
+                                                        , name = name
+                                                        , tipe =
+                                                            (CanonicalAst.TAlias
+                                                                { home = canMod.name
+                                                                , name = name
+                                                                , fields =
+                                                                    ali.vars
+                                                                        |> Array.map
+                                                                            (\var ->
+                                                                                { name = var
+                                                                                , tipe = CanonicalAst.TVar var
+                                                                                }
+                                                                            )
+                                                                , aliasTipe = CanonicalAst.Holey ali.tipe
+                                                                }
+                                                            )
+                                                        }
+                                                        acc
+                                                )
+                                                []
+                                                canMod.aliases
 
-                                        CanonicalAst.ExportEverything _ ->
-                                            -- TODO: duplicates?
-                                            canMod.aliases
-                                                |> Dict.map
-                                                    (\name ali ->
-                                                        CanonicalAst.TAlias
-                                                            { home = canMod.name
-                                                            , name = name
-                                                            , fields =
-                                                                ali.vars
-                                                                    |> Array.map
-                                                                        (\var ->
-                                                                            { name = var
-                                                                            , tipe = CanonicalAst.TVar var
-                                                                            }
-                                                                        )
-                                                            , aliasTipe = CanonicalAst.Holey ali.tipe
-                                                            }
-                                                    )
-                                                |> Dict.union dict
+                                        scopedEntriesQualified =
+                                            Array.foldl
+                                                (\ali acc -> ScopedEntries.addQualified ali.home ali.name ali.tipe acc)
+                                                ScopedEntries.empty
+                                                aliases
+
+                                        exposed =
+                                            when canMod.exports is
+                                                CanonicalAst.Export exports ->
+                                                    Array.keepIf (\a -> Dict.member a.name exports) aliases
+
+                                                CanonicalAst.ExportEverything _ ->
+                                                    aliases
+                                    in
+                                    Array.foldl
+                                        (\ali acc -> ScopedEntries.add ali.name ali.tipe acc)
+                                        scopedEntriesQualified
+                                        exposed
+                                        |> ScopedEntries.union endScope
                         )
-                        Dict.empty
+                        ScopedEntries.empty
                         impl.imports
 
                 typeAliasResult =
@@ -379,8 +402,8 @@ canonicalizeModuleContent realName pkg parsedModule context =
 
                 localTypes =
                     Array.foldl
-                        (\name dict ->
-                            Dict.set
+                        (\name scope ->
+                            ScopedEntries.add
                                 name
                                 (CanonicalAst.TType
                                     { home = sig.name.value
@@ -388,9 +411,9 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                     , vars = []
                                     }
                                 )
-                                dict
+                                scope
                         )
-                        Dict.empty
+                        ScopedEntries.empty
                         typeNames
 
                 canResult =
@@ -802,28 +825,40 @@ canonicalizeEffects effects =
 
 
 
-canonicalizeType : Dict String CanonicalAst.Type -> ParseAst.Type -> Result Error CanonicalAst.Type
-canonicalizeType recognizedTypes tipe =
+canonicalizeType : ScopedEntries CanonicalAst.Type -> ParseAst.Type -> Result Error CanonicalAst.Type
+canonicalizeType scopedTypes tipe =
     when tipe.value is
         ParseAst.TLambda lambda ->
             Result.map2
                 (\from to -> CanonicalAst.TLambda { from = from, to = to })
-                (canonicalizeType recognizedTypes lambda.from)
-                (canonicalizeType recognizedTypes lambda.to)
+                (canonicalizeType scopedTypes lambda.from)
+                (canonicalizeType scopedTypes lambda.to)
 
         ParseAst.TVar name ->
             Ok (CanonicalAst.TVar name)
 
         ParseAst.TType { name, args } ->
-            when Dict.get name.value recognizedTypes is
-                Just t ->
+            when Dict.get name.value scopedTypes.unqualified is
+                Just { first = t, rest = [] } ->
                     Ok t
 
-                Nothing ->
+                -- TODO: handle duplicates
+                _ ->
                     Err PlaceholderError
 
         ParseAst.TTypeQual { varRegion, qualifier, name, args } ->
-            Err PlaceholderError
+            when Dict.get qualifier scopedTypes.qualified is
+                Just inMod ->
+                    when Dict.get name inMod is
+                        Just { first = t, rest = [] } ->
+                            Ok t
+
+                        -- TODO: handle duplicates
+                        _ ->
+                            Err PlaceholderError
+
+                Nothing ->
+                    Err PlaceholderError
 
         ParseAst.TRecord { fields, extending } ->
             let
@@ -832,7 +867,7 @@ canonicalizeType recognizedTypes tipe =
                         (\field acc ->
                             Result.andThen
                                 (\canFields ->
-                                    canonicalizeType recognizedTypes field.signature
+                                    canonicalizeType scopedTypes field.signature
                                         |> Result.map
                                             (\canField ->
                                                 Dict.set
@@ -856,7 +891,7 @@ canonicalizeType recognizedTypes tipe =
                 canFieldResult
 
         ParseAst.TParens pTipe ->
-            canonicalizeType recognizedTypes pTipe
+            canonicalizeType scopedTypes pTipe
 
 
 -- APPLY MODULE PARAMS

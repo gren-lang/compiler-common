@@ -1,0 +1,69 @@
+module Compiler.Canonicalize.ScopedEntries exposing (..)
+
+
+import Dict exposing (Dict)
+import Compiler.ModuleName as ModuleName exposing (ModuleName)
+
+
+type alias ScopedEntries a =
+    { unqualified : Dict String (OneOrMore a)
+    , qualified : Dict String (Dict String (OneOrMore a))
+    }
+
+
+type alias OneOrMore a =
+    { first : a
+    , rest : Array a
+    }
+
+
+empty : ScopedEntries a
+empty =
+    { unqualified = Dict.empty
+    , qualified = Dict.empty
+    }
+
+
+add : String -> a -> ScopedEntries a -> ScopedEntries a
+add name value scoped =
+    { scoped | unqualified = addUnqualifiedHelper name value scoped.unqualified }
+
+
+addUnqualifiedHelper : String -> a -> Dict String (OneOrMore a) -> Dict String (OneOrMore a)
+addUnqualifiedHelper name value dict =
+    Dict.update
+        name
+        (\maybeValue ->
+            when maybeValue is
+                Nothing ->
+                    Just { first = value, rest = [] }
+
+                Just { first, rest } ->
+                    Just { first = first, rest = Array.pushLast value rest }
+        )
+        dict
+
+
+addQualified : ModuleName -> String -> a -> ScopedEntries a -> ScopedEntries a
+addQualified mod name value scoped =
+    { scoped
+        | qualified =
+            Dict.update
+                (ModuleName.toString mod)
+                (\maybeVals ->
+                    when maybeVals is
+                        Nothing ->
+                            Just (Dict.singleton name { first = value, rest = [] })
+
+                        Just vals ->
+                            Just (addUnqualifiedHelper name value vals)
+                )
+                scoped.qualified
+    }
+
+
+union : ScopedEntries a -> ScopedEntries a -> ScopedEntries a
+union left right =
+    { unqualified = Dict.union left.unqualified right.unqualified
+    , qualified = Dict.union left.qualified right.qualified
+    }

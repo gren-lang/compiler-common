@@ -172,10 +172,31 @@ tests =
                       }
                     ]
                     |> Snapshot.this
+            , test "Qualified alias" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
+
+                        type alias Person = { name : str }
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module Main exposing (..)
+
+                        import MyModule
+
+                        type alias AliasedPerson = MyModule.Person
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
             -- TODO: alias to custom type
             -- alias of internal alias
             -- custom type with alias
-            -- qualified
             ]
         , describe "Binops"
             [ test "Intra module" <| \_ ->
