@@ -373,25 +373,17 @@ canonicalizeModuleContent realName pkg parsedModule context =
                         |> Result.withDefault expressionContext
 
                 decsResult =
-                    typeAliasResult
-                        |> Result.andThen
-                            (\tipes ->
-                                let
-                                    knownTypes =
-                                        Dict.map (\k v -> v.tipe) tipes
-                                in
-                                Array.foldl
-                                    (\decl declsResult ->
-                                        Result.andThen
-                                            (\decls ->
-                                                canonicalizeDef contextWithUnions scopedTypes decl.value.value
-                                                    |> Result.map (\d -> CanonicalAst.Declare { def = d, decls = decls })
-                                            )
-                                            declsResult
-                                    )
-                                    (Ok CanonicalAst.SaveTheEnvironment)
-                                    impl.values
-                            )
+                    Array.foldl
+                        (\decl declsResult ->
+                            Result.andThen
+                                (\decls ->
+                                    canonicalizeDef contextWithUnions scopedTypes decl.value.value
+                                        |> Result.map (\d -> CanonicalAst.Declare { def = d, decls = decls })
+                                )
+                                declsResult
+                        )
+                        (Ok CanonicalAst.SaveTheEnvironment)
+                        impl.values
             in
             Ok
                 (\canonicalExports canonicalEffects canAlias canUnions canDecls ->
