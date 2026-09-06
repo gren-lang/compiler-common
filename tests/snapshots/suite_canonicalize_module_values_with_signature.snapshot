@@ -1,0 +1,89 @@
+Ok 
+    { modules = Dict.fromArray 
+        [
+            { key = "MyModule"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                        { key = "Int"
+                        , value = 
+                            { tipe = TRecord 
+                                { alias = Nothing
+                                , fields = Dict.fromArray 
+                                    [
+                                    ] 
+                                }
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = Declare 
+                    { decls = SaveTheEnvironment
+                    , def = TypedDef 
+                        { body = 
+                            { end = 
+                                { col = 7
+                                , row = 6 
+                                }
+                            , start = 
+                                { col = 5
+                                , row = 6 
+                                }
+                            , value = Int 42 
+                            }
+                        , freeVars = Set.fromArray 
+                            [
+                            ]
+                        , name = 
+                            { end = 
+                                { col = 2
+                                , row = 6 
+                                }
+                            , start = 
+                                { col = 1
+                                , row = 6 
+                                }
+                            , value = "x" 
+                            }
+                        , params = 
+                            [
+                            ]
+                        , signature = TRecord 
+                            { alias = Nothing
+                            , fields = Dict.fromArray 
+                                [
+                                ] 
+                            } 
+                        } 
+                    }
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 16
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "MyModule"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        ]
+    , signatures = Dict.fromArray 
+        [
+        ] 
+    }

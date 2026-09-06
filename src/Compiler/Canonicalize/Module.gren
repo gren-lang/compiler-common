@@ -303,6 +303,19 @@ canonicalizeModuleContent realName pkg parsedModule context =
                         (Ok Dict.empty)
                         impl.aliases
 
+                scopedTypes =
+                    when typeAliasResult is
+                        Err _ ->
+                            externalAliases
+
+                        Ok ts ->
+                            Dict.foldl
+                                (\name value scope ->
+                                    ScopedEntries.add name value.tipe scope
+                                )
+                                externalAliases
+                                ts
+
                 unionResult =
                     Array.foldl
                         (\union acc ->
@@ -360,18 +373,25 @@ canonicalizeModuleContent realName pkg parsedModule context =
                         |> Result.withDefault expressionContext
 
                 decsResult =
-                    Array.foldl
-                        (\decl declsResult ->
-                            Result.andThen
-                                (\decls ->
-                                    canonicalizeDef contextWithUnions decl.value.value
-                                        |> Result.map (\d -> CanonicalAst.Declare { def = d, decls = decls })
-                                )
-                                declsResult
-                        )
-                        (Ok CanonicalAst.SaveTheEnvironment)
-                        impl.values
-
+                    typeAliasResult
+                        |> Result.andThen
+                            (\tipes ->
+                                let
+                                    knownTypes =
+                                        Dict.map (\k v -> v.tipe) tipes
+                                in
+                                Array.foldl
+                                    (\decl declsResult ->
+                                        Result.andThen
+                                            (\decls ->
+                                                canonicalizeDef contextWithUnions scopedTypes decl.value.value
+                                                    |> Result.map (\d -> CanonicalAst.Declare { def = d, decls = decls })
+                                            )
+                                            declsResult
+                                    )
+                                    (Ok CanonicalAst.SaveTheEnvironment)
+                                    impl.values
+                            )
             in
             Ok
                 (\canonicalExports canonicalEffects canAlias canUnions canDecls ->
@@ -780,36 +800,65 @@ canonicalizeUnion context value =
 
 {-| Canonicalize a single definition (value).
 -}
-canonicalizeDef : Expression.Context -> ParseAst.Value -> Result Error CanonicalAst.Def
-canonicalizeDef context value =
-    when value.signature is
-        Nothing ->
-            Result.map2
-                (\params body ->
+canonicalizeDef : Expression.Context -> ScopedEntries CanonicalAst.Type -> ParseAst.Value -> Result Error CanonicalAst.Def
+canonicalizeDef context knownTypes value =
+    Result.map3
+        (\maybeSign params body ->
+            when maybeSign is
+                Nothing ->
                     CanonicalAst.Def
                         { name = value.name
                         , params = params
                         , body = body
                         }
-                )
-                (Array.foldl
-                    (\pat acc ->
-                        Result.andThen
-                            (\current ->
-                                Result.map
-                                    (\p -> Array.append current [p])
-                                    (Expression.canonicalizePattern context pat)
-                            )
-                            acc
-                    )
-                    (Ok [])
-                    value.args
-                    |> Result.mapError ExpressionError
-                )
-                (Expression.canonicalize context value.body |> Result.mapError ExpressionError)
 
-        Just _ ->
-            Err PlaceholderError
+                Just sign ->
+                    CanonicalAst.TypedDef
+                        { name = value.name
+                        , freeVars = Set.empty -- TODO
+                        , params =
+                            -- TODO: what about when params > types?
+                            Array.map2
+                                (\p t -> { pattern = p, tipe = t })
+                                params
+                                (tipeAsArray sign)
+                        , body = body
+                        , signature = sign
+                        }
+        )
+        (when value.signature is
+            Nothing ->
+                Ok Nothing
+
+            Just s ->
+                canonicalizeType knownTypes s.type_
+                    |> Result.map Just
+        )
+        (Array.foldl
+            (\pat acc ->
+                Result.andThen
+                    (\current ->
+                        Result.map
+                            (\p -> Array.append current [p])
+                            (Expression.canonicalizePattern context pat)
+                    )
+                    acc
+            )
+            (Ok [])
+            value.args
+            |> Result.mapError ExpressionError
+        )
+        (Expression.canonicalize context value.body |> Result.mapError ExpressionError)
+
+
+tipeAsArray : CanonicalAst.Type -> Array CanonicalAst.Type
+tipeAsArray t =
+    when t is
+        CanonicalAst.TLambda { from, to } ->
+            Array.pushFirst from (tipeAsArray to)
+
+        _ ->
+            [ t ]
 
 
 {-| Canonicalize effects.
@@ -838,6 +887,7 @@ canonicalizeType scopedTypes tipe =
             Ok (CanonicalAst.TVar name)
 
         ParseAst.TType { name, args } ->
+            -- TODO: args
             when Dict.get name.value scopedTypes.unqualified is
                 Just { first = t, rest = [] } ->
                     Ok t

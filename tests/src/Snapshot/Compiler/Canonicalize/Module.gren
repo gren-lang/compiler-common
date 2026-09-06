@@ -49,6 +49,38 @@ tests =
                       }
                     ]
                     |> Snapshot.this
+            , test "With signature" <| \_ ->
+                -- Canonicalization doesn't do type checking
+                -- so we can test canonicalization with bad types
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
+
+                        type alias Int = {}
+
+                        x : Int
+                        x = 42
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            , test "Function signature" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
+
+                        type alias Int = {}
+
+                        x : Int -> Int -> Int
+                        x a b = 42
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
             , test "Reference to other module" <| \_ ->
                 canonicalize
                     [ { package = PackageName.example
