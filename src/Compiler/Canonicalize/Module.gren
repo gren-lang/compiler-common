@@ -223,6 +223,28 @@ canonicalizeModuleContent realName pkg parsedModule context =
                 effectsResult =
                     canonicalizeEffects impl.effects
 
+                parsedLocalTypeAliases =
+                    Array.foldl
+                        (\alias acc ->
+                            Dict.set
+                                alias.value.value.name.value
+                                (TypeAlias (Array.map .value alias.value.value.vars))
+                                acc
+                        )
+                        Dict.empty
+                        impl.aliases
+
+                parsedLocalTypes =
+                    Array.foldl
+                        (\union acc ->
+                            Dict.set
+                                union.value.value.name.value
+                                (CustomType (Array.map .value union.value.value.vars))
+                                acc
+                        )
+                        Dict.empty
+                        impl.unions
+
                 externalAliases =
                     Array.foldl
                         (\{ value = imp } endScope ->
@@ -296,7 +318,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                                 }
                                                 canAliases
                                         )
-                                        (canonicalizeType externalAliases alias.value.value.type_)
+                                        (canonicalizeType realName externalAliases parsedLocalTypes alias.value.value.type_)
                                 )
                                 acc
                         )
@@ -377,7 +399,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                         (\decl declsResult ->
                             Result.andThen
                                 (\decls ->
-                                    canonicalizeDef contextWithUnions scopedTypes decl.value.value
+                                    canonicalizeDef contextWithUnions scopedTypes parsedLocalTypes decl.value.value
                                         |> Result.map (\d -> CanonicalAst.Declare { def = d, decls = decls })
                                 )
                                 declsResult
@@ -433,7 +455,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                         (\value accResult ->
                             Result.andThen
                                 (\acc ->
-                                    canonicalizeType localTypes value.value.value.signature
+                                    canonicalizeType realName localTypes Dict.empty value.value.value.signature
                                         |> Result.map
                                             (\t ->
                                                 Dict.set
@@ -792,8 +814,8 @@ canonicalizeUnion context value =
 
 {-| Canonicalize a single definition (value).
 -}
-canonicalizeDef : Expression.Context -> ScopedEntries CanonicalAst.Type -> ParseAst.Value -> Result Error CanonicalAst.Def
-canonicalizeDef context knownTypes value =
+canonicalizeDef : Expression.Context -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Value -> Result Error CanonicalAst.Def
+canonicalizeDef context knownTypes parsedLocalTypes value =
     Result.map3
         (\maybeSign params body ->
             when maybeSign is
@@ -823,7 +845,7 @@ canonicalizeDef context knownTypes value =
                 Ok Nothing
 
             Just s ->
-                canonicalizeType knownTypes s.type_
+                canonicalizeType context.currentModule knownTypes parsedLocalTypes s.type_
                     |> Result.map Just
         )
         (Array.foldl
@@ -865,15 +887,19 @@ canonicalizeEffects effects =
             Err PlaceholderError
 
 
+type LocalTypeKind
+    = CustomType (Array String)
+    | TypeAlias (Array String)
+    
 
-canonicalizeType : ScopedEntries CanonicalAst.Type -> ParseAst.Type -> Result Error CanonicalAst.Type
-canonicalizeType scopedTypes tipe =
+canonicalizeType : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Type -> Result Error CanonicalAst.Type
+canonicalizeType home scopedTypes parsedLocalTypes tipe =
     when tipe.value is
         ParseAst.TLambda lambda ->
             Result.map2
                 (\from to -> CanonicalAst.TLambda { from = from, to = to })
-                (canonicalizeType scopedTypes lambda.from)
-                (canonicalizeType scopedTypes lambda.to)
+                (canonicalizeType home scopedTypes parsedLocalTypes lambda.from)
+                (canonicalizeType home scopedTypes parsedLocalTypes lambda.to)
 
         ParseAst.TVar name ->
             Ok (CanonicalAst.TVar name)
@@ -885,10 +911,29 @@ canonicalizeType scopedTypes tipe =
                     Ok t
 
                 -- TODO: handle duplicates
-                _ ->
+                Just _ ->
                     Err PlaceholderError
 
+                Nothing ->
+                    when Dict.get name.value parsedLocalTypes is
+                        Just (TypeAlias vars) ->
+                            Err PlaceholderError
+
+                        Just (CustomType vars) ->
+                            Ok
+                                (CanonicalAst.TType
+                                    { home = home
+                                    , name = name.value
+                                    -- TODO: use provided args, only use type vars to verify arity
+                                    , vars = Array.map CanonicalAst.TVar vars
+                                    }
+                                )
+
+                        Nothing ->
+                            Err PlaceholderError
+
         ParseAst.TTypeQual { varRegion, qualifier, name, args } ->
+            -- TODO: args
             when Dict.get qualifier scopedTypes.qualified is
                 Just inMod ->
                     when Dict.get name inMod is
@@ -909,7 +954,7 @@ canonicalizeType scopedTypes tipe =
                         (\field acc ->
                             Result.andThen
                                 (\canFields ->
-                                    canonicalizeType scopedTypes field.signature
+                                    canonicalizeType home scopedTypes parsedLocalTypes field.signature
                                         |> Result.map
                                             (\canField ->
                                                 Dict.set
@@ -933,7 +978,7 @@ canonicalizeType scopedTypes tipe =
                 canFieldResult
 
         ParseAst.TParens pTipe ->
-            canonicalizeType scopedTypes pTipe
+            canonicalizeType home scopedTypes parsedLocalTypes pTipe
 
 
 -- APPLY MODULE PARAMS

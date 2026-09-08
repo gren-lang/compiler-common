@@ -1,0 +1,115 @@
+Ok 
+    { modules = Dict.fromArray 
+        [
+            { key = "Main"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                        { key = "AliasedCustom"
+                        , value = 
+                            { tipe = TType 
+                                { home = ModuleName "Main"
+                                , name = "MyCustom"
+                                , vars = 
+                                    [
+                                    ] 
+                                }
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 12
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Main"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                        { key = "MyCustom"
+                        , value = 
+                            { alts = 
+                                [
+                                    { arg = Nothing
+                                    , index = 0
+                                    , name = "MyCustomCtor" 
+                                    }
+                                ]
+                            , name = "MyCustom"
+                            , opts = Enum
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    ] 
+                } 
+            }
+        , 
+            { key = "MyModule"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                        { key = "Person"
+                        , value = 
+                            { tipe = TRecord 
+                                { alias = Nothing
+                                , fields = Dict.fromArray 
+                                    [
+                                        { key = "name"
+                                        , value = TVar "str" 
+                                        }
+                                    ] 
+                                }
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 16
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "MyModule"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        ]
+    , signatures = Dict.fromArray 
+        [
+        ] 
+    }
