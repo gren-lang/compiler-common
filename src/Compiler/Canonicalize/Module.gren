@@ -343,7 +343,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                         (\union acc ->
                             Result.andThen
                                 (\unions ->
-                                    canonicalizeUnion expressionContext union.value.value
+                                    canonicalizeUnion realName externalAliases parsedLocalTypes expressionContext union.value.value
                                         |> Result.map
                                             (\u ->
                                                 Dict.set
@@ -783,33 +783,58 @@ canonicalizeExports exposings region =
 
 {-| Canonicalize a single union
 -}
-canonicalizeUnion : Expression.Context -> ParseAst.Union -> Result Error CanonicalAst.Union
-canonicalizeUnion context value =
-    Ok
-        { name = value.name.value
-        , vars = Array.map .value value.vars
-        , alts =
+canonicalizeUnion : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> Expression.Context -> ParseAst.Union -> Result Error CanonicalAst.Union
+canonicalizeUnion moduleName knownTypes localParsedTypes context value =
+    let
+        altsResult =
             Array.indexedMap
                 (\idx { value = variant } ->
-                    { name = variant.name.value
-                    , index = idx
-                    -- TODO: canonicalize types
-                    , arg = Nothing
-                    }
+                    when variant.payload is
+                        Nothing ->
+                            Ok
+                                { name = variant.name.value
+                                , index = idx
+                                , arg = Nothing
+                                }
+
+                        Just payload ->
+                            canonicalizeType moduleName knownTypes localParsedTypes payload
+                                |> Result.map
+                                    (\canType ->
+                                        { name = variant.name.value
+                                        , index = idx
+                                        , arg = Just canType
+                                        }
+                                    )
                 )
                 value.variants
-        , opts =
-            when value.variants is
-                [ { value = { payload = Just _ } } ] ->
-                    CanonicalAst.Unbox
+    in
+    when Result.allOk altsResult is
+        Ok alts ->
+            Ok
+                { name = value.name.value
+                , vars = Array.map .value value.vars
+                , alts = alts
+                , opts =
+                    when value.variants is
+                        [ { value = { payload = Just _ } } ] ->
+                            CanonicalAst.Unbox
 
-                _ ->
-                    if Array.any (\var -> var.value.payload /= Nothing ) value.variants then
-                        CanonicalAst.Normal
+                        _ ->
+                            if Array.any (\var -> var.value.payload /= Nothing ) value.variants then
+                                CanonicalAst.Normal
 
-                    else
-                        CanonicalAst.Enum
-        }
+                            else
+                                CanonicalAst.Enum
+                }
+
+        Err errs ->
+            when Array.popFirst errs is
+                Just { first } ->
+                    Err first
+
+                Nothing ->
+                    Err PlaceholderError
 
 
 {-| Canonicalize a single definition (value).
