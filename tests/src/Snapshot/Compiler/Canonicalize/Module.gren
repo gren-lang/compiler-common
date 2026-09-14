@@ -250,8 +250,21 @@ tests =
                       }
                     ]
                     |> Snapshot.this
-            -- TODO: alias of internal alias
-            -- custom type with alias
+            , test "Alias of alias" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module Main exposing (..)
+
+                        type alias MyCustom = {}
+
+                        type alias AliasedCustom = MyCustom
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            -- TODO: custom type with alias
             ]
         , describe "Binops"
             [ test "Intra module" <| \_ ->

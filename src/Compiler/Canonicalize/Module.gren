@@ -228,7 +228,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                         (\alias acc ->
                             Dict.set
                                 alias.value.value.name.value
-                                (TypeAlias (Array.map .value alias.value.value.vars))
+                                (TypeAlias alias.value.value)
                                 acc
                         )
                         Dict.empty
@@ -242,7 +242,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                 (CustomType (Array.map .value union.value.value.vars))
                                 acc
                         )
-                        Dict.empty
+                        parsedLocalTypeAliases
                         impl.unions
 
                 externalAliases =
@@ -914,7 +914,7 @@ canonicalizeEffects effects =
 
 type LocalTypeKind
     = CustomType (Array String)
-    | TypeAlias (Array String)
+    | TypeAlias ParseAst.Alias
     
 
 canonicalizeType : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Type -> Result Error CanonicalAst.Type
@@ -941,8 +941,25 @@ canonicalizeType home scopedTypes parsedLocalTypes tipe =
 
                 Nothing ->
                     when Dict.get name.value parsedLocalTypes is
-                        Just (TypeAlias vars) ->
-                            Err PlaceholderError
+                        Just (TypeAlias alias) ->
+                            canonicalizeType home scopedTypes parsedLocalTypes alias.type_
+                                |> Result.map
+                                    (\canType ->
+                                        CanonicalAst.TAlias
+                                            { home = home
+                                            , name = name.value
+                                            -- TODO: can args
+                                            , fields =
+                                                Array.map
+                                                    (\v ->
+                                                        { name = v.value
+                                                        , tipe = CanonicalAst.TVar v.value
+                                                        }
+                                                    )
+                                                    alias.vars
+                                            , aliasTipe = CanonicalAst.Holey canType
+                                            }
+                                    )
 
                         Just (CustomType vars) ->
                             Ok
@@ -997,6 +1014,7 @@ canonicalizeType home scopedTypes parsedLocalTypes tipe =
                 (\canFields ->
                     CanonicalAst.TRecord
                         { fields = canFields
+                        -- TODO: alias or extends?
                         , alias = Maybe.map .value extending
                         }
                 )

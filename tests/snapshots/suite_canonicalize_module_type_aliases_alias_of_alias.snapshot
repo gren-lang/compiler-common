@@ -1,0 +1,74 @@
+Ok 
+    { modules = Dict.fromArray 
+        [
+            { key = "Main"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                        { key = "AliasedCustom"
+                        , value = 
+                            { tipe = TAlias 
+                                { aliasTipe = Holey 
+                                    (TRecord 
+                                        { alias = Nothing
+                                        , fields = Dict.fromArray 
+                                            [
+                                            ] 
+                                        }
+                                    )
+                                , fields = 
+                                    [
+                                    ]
+                                , home = ModuleName "Main"
+                                , name = "MyCustom" 
+                                }
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    , 
+                        { key = "MyCustom"
+                        , value = 
+                            { tipe = TRecord 
+                                { alias = Nothing
+                                , fields = Dict.fromArray 
+                                    [
+                                    ] 
+                                }
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 12
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Main"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        ]
+    , signatures = Dict.fromArray 
+        [
+        ] 
+    }
