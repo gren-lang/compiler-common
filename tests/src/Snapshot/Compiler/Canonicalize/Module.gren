@@ -316,6 +316,7 @@ tests =
                       }
                     ]
                     |> Snapshot.this
+            -- TODO: ports and effects
             ]
         , describe "Parametric modules"
             [ test "Declaration" <| \_ ->
