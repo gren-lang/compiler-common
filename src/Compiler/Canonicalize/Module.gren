@@ -43,6 +43,8 @@ type Error
     | ExpressionError Expression.Error
     | CyclicDependency ModuleName
     | ModuleNotFound ModuleName
+    | ExposedTwice (SourcePosition.Located String)
+    | ExposeNotFound (SourcePosition.Located String)
 
 
 {-| Takes in a `Dict` of parsed modules, where the `String` key represents a module name, and returns
@@ -218,7 +220,8 @@ canonicalizeModuleContent realName pkg parsedModule context =
                     createExpressionContext pkg context impl
 
                 exportsResult =
-                    canonicalizeExports impl.exports { start = impl.name.start, end = impl.name.end }
+                    -- TODO: is the constructed region correct?
+                    canonicalizeExports impl { start = impl.name.start, end = impl.name.end }
 
                 effectsResult =
                     canonicalizeEffects impl.effects
@@ -771,14 +774,67 @@ dummyAnnotation =
 
 {-| Canonicalize exports from a module.
 -}
-canonicalizeExports : ParseAst.Exposing -> SourcePosition.Region -> Result Error CanonicalAst.Exports
-canonicalizeExports exposings region =
-    when exposings is
+canonicalizeExports : ParseAst.ModuleImplementation -> SourcePosition.Region -> Result Error CanonicalAst.Exports
+canonicalizeExports impl region =
+    when impl.exports is
         ParseAst.Open ->
             Ok (CanonicalAst.ExportEverything region)
 
-        ParseAst.Explicit _ ->
-            Err PlaceholderError
+        ParseAst.Explicit list ->
+            Array.foldl
+                (\exp accResult ->
+                    Result.andThen
+                        (\acc ->
+                            when exp is
+                                ParseAst.ExposedLower low ->
+                                    if Dict.member low.value acc then
+                                        -- TODO: Test
+                                        Err (ExposedTwice low)
+
+                                    else if Array.any (\v -> low.value == v.value.value.name.value) impl.values then
+                                        Ok (Dict.set low.value (SourcePosition.swap CanonicalAst.ExportValue low) acc)
+
+                                    else
+                                        -- TODO: Test
+                                        Err (ExposeNotFound low)
+
+                                ParseAst.ExposedUpper up ->
+                                    if Dict.member up.name.value acc then
+                                        Err (ExposedTwice up.name)
+
+                                    else if Array.any (\v -> up.name.value == v.value.value.name.value) impl.unions then
+                                        let
+                                            exposeType =
+                                                when up.privacy is
+                                                    ParseAst.Private ->
+                                                        CanonicalAst.ExportUnionClosed
+
+                                                    ParseAst.Public ->
+                                                        CanonicalAst.ExportUnionOpen
+                                        in
+                                        Ok (Dict.set up.name.value (SourcePosition.swap exposeType up.name) acc)
+
+                                    else if Array.any (\v -> up.name.value == v.value.value.name.value) impl.aliases then
+                                        Ok (Dict.set up.name.value (SourcePosition.swap CanonicalAst.ExportAlias up.name) acc)
+
+                                    else
+                                        Err (ExposeNotFound up.name)
+
+                                ParseAst.ExposedOperator op ->
+                                    if Dict.member op.value acc then
+                                        Err (ExposedTwice op)
+
+                                    else if Array.any (\v -> op.value == v.value.symbol) impl.binops then
+                                        Ok (Dict.set op.value (SourcePosition.swap CanonicalAst.ExportBinop op) acc)
+
+                                    else
+                                        Err (ExposeNotFound op)
+                        )
+                        accResult
+                )
+                (Ok Dict.empty)
+                list
+                |> Result.map CanonicalAst.Export
 
 
 {-| Canonicalize a single union

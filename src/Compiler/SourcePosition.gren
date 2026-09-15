@@ -4,6 +4,7 @@ module Compiler.SourcePosition exposing
     , Region
     , Located
     , at
+    , swap
     , parser
     )
 
@@ -14,7 +15,7 @@ line and column in a file.
 The Gren AST has a lot of these in order to generate descriptive error
 messages and to enable source mapping.
 
-@docs Position, emptyPos, Region, Located, at, parser
+@docs Position, emptyPos, Region, Located, at, swap, parser
 -}
 
 import String.Parser.Advanced as Parser exposing (Parser)
@@ -63,6 +64,13 @@ a simple record literal.
 at : Position -> Position -> a -> Located a
 at start end a =
     { start = start, end = end, value = a }
+
+
+{-| Replace the value of a Located value.
+-}
+swap : b -> Located a -> Located b
+swap val { start, end } =
+    { start = start, end = end, value = val }
 
 
 {-| Takes a parser for a value, and makes it `Located`.

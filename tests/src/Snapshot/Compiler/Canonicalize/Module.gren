@@ -297,6 +297,26 @@ tests =
                     ]
                     |> Snapshot.this
             ]
+        , describe "Exposing"
+            [ test "All the things" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module Open exposing (Custom, Alias, add, (+))
+
+                        infix left 6 (+) = add
+
+                        type Custom = None
+
+                        type alias Alias = {}
+
+                        add a b = 0
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            ]
         , describe "Parametric modules"
             [ test "Declaration" <| \_ ->
                 canonicalize
