@@ -264,7 +264,20 @@ tests =
                       }
                     ]
                     |> Snapshot.this
-            -- TODO: custom type with alias
+            , test "Custom type with alias" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module Main exposing (..)
+
+                        type MyCustom = Rec
+
+                        type alias Rec = {}
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
             ]
         , describe "Binops"
             [ test "Intra module" <| \_ ->
