@@ -168,6 +168,31 @@ tests =
                       }
                     ]
                     |> Snapshot.this
+            , test "Exposed type signature" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
+
+                        type Maybe a
+                            = Just a
+                            | Nothing
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module Main exposing (..)
+
+                        import MyModule exposing (..)
+
+                        x : Maybe {}
+                        x = Just 5
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
             ]
         , describe "Type aliases"
             [ test "Intra module" <| \_ ->
@@ -316,7 +341,31 @@ tests =
                       }
                     ]
                     |> Snapshot.this
-            -- TODO: ports and effects
+            ]
+        , describe "Effects"
+            [ test "Ports" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.core
+                      , source =
+                        """
+                        module Platform.Cmd exposing (..)
+
+                        type Cmd msg = Cmd
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module Fx exposing (..)
+
+                        import Platform.Cmd exposing (Cmd)
+
+                        port outgoing : {} -> Cmd msg
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            -- TODO: effects
             ]
         , describe "Parametric modules"
             [ test "Declaration" <| \_ ->

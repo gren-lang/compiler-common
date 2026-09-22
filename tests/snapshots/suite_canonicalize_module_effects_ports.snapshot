@@ -1,0 +1,117 @@
+Ok 
+    { modules = Dict.fromArray 
+        [
+            { key = "Fx"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = Ports 
+                    (Dict.fromArray 
+                        [
+                            { key = "outgoing"
+                            , value = Outgoing 
+                                { freeVars = Set.fromArray 
+                                    [
+                                    ]
+                                , func = TLambda 
+                                    { from = TRecord 
+                                        { alias = Nothing
+                                        , fields = Dict.fromArray 
+                                            [
+                                            ] 
+                                        }
+                                    , to = TType 
+                                        { home = ModuleName "Platform.Cmd"
+                                        , name = "Cmd"
+                                        , vars = 
+                                            [TVar "msg"
+                                            ] 
+                                        } 
+                                    }
+                                , payload = TRecord 
+                                    { alias = Nothing
+                                    , fields = Dict.fromArray 
+                                        [
+                                        ] 
+                                    } 
+                                } 
+                            }
+                        ]
+                    )
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 10
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Fx"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                    ] 
+                } 
+            }
+        , 
+            { key = "Platform.Cmd"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 20
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Platform.Cmd"
+                , package = PackageName 
+                    { author = "gren-lang"
+                    , name = "core" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                        { key = "Cmd"
+                        , value = 
+                            { alts = 
+                                [
+                                    { arg = Nothing
+                                    , index = 0
+                                    , name = "Cmd" 
+                                    }
+                                ]
+                            , name = "Cmd"
+                            , opts = Enum
+                            , vars = 
+                                ["msg"
+                                ] 
+                            } 
+                        }
+                    ] 
+                } 
+            }
+        ]
+    , signatures = Dict.fromArray 
+        [
+        ] 
+    }

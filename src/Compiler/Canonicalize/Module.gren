@@ -224,7 +224,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                     canonicalizeExports impl { start = impl.name.start, end = impl.name.end }
 
                 effectsResult =
-                    canonicalizeEffects impl.effects
+                    canonicalizeEffects realName scopedTypes parsedLocalTypes impl.effects
 
                 parsedLocalTypeAliases =
                     Array.foldl
@@ -284,22 +284,41 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                                 []
                                                 canMod.aliases
 
+                                        entries =
+                                            Dict.foldl
+                                                (\name union acc ->
+                                                    Array.pushLast
+                                                        { home = canMod.name
+                                                        , name = name
+                                                        , tipe =
+                                                            (CanonicalAst.TType
+                                                                { home = canMod.name
+                                                                , name = name
+                                                                , vars = Array.map CanonicalAst.TVar union.vars
+                                                                }
+                                                            )
+                                                        }
+                                                        acc
+                                                )
+                                                aliases
+                                                canMod.unions
+
                                         scopedEntriesQualified =
                                             Array.foldl
-                                                (\ali acc -> ScopedEntries.addQualified ali.home ali.name ali.tipe acc)
+                                                (\t acc -> ScopedEntries.addQualified t.home t.name t.tipe acc)
                                                 ScopedEntries.empty
-                                                aliases
+                                                entries
 
                                         exposed =
                                             when canMod.exports is
                                                 CanonicalAst.Export exports ->
-                                                    Array.keepIf (\a -> Dict.member a.name exports) aliases
+                                                    Array.keepIf (\a -> Dict.member a.name exports) entries
 
                                                 CanonicalAst.ExportEverything _ ->
-                                                    aliases
+                                                    entries
                                     in
                                     Array.foldl
-                                        (\ali acc -> ScopedEntries.add ali.name ali.tipe acc)
+                                        (\t acc -> ScopedEntries.add t.name t.tipe acc)
                                         scopedEntriesQualified
                                         exposed
                                         |> ScopedEntries.union endScope
@@ -956,16 +975,211 @@ tipeAsArray t =
             [ t ]
 
 
+dealias : Array { name : String, tipe : CanonicalAst.Type } -> CanonicalAst.AliasType -> CanonicalAst.Type
+dealias args t =
+    when t is
+        CanonicalAst.Holey t_ ->
+            dealiasHelp
+                (Array.foldl (\{ name, tipe } dict -> Dict.set name tipe dict) Dict.empty args)
+                t_
+
+        CanonicalAst.Filled t_ ->
+            t_
+
+
+dealiasHelp : Dict String CanonicalAst.Type -> CanonicalAst.Type -> CanonicalAst.Type
+dealiasHelp typeTable t =
+    when t is
+        CanonicalAst.TLambda { from, to } ->
+            CanonicalAst.TLambda
+                { from = dealiasHelp typeTable from
+                , to = dealiasHelp typeTable to
+                }
+
+        CanonicalAst.TVar x ->
+            Dict.get x typeTable
+                |> Maybe.withDefault t
+
+        CanonicalAst.TType { home, name, vars } ->
+            CanonicalAst.TType
+                { home = home
+                , name = name
+                , vars = Array.map (dealiasHelp typeTable) vars
+                }
+
+        CanonicalAst.TAlias { home, name, fields, aliasTipe } ->
+            CanonicalAst.TAlias
+                { home = home
+                , name = name
+                , fields =
+                    Array.map
+                        (\{ name = n, tipe = t_ } -> { name = n, tipe = dealiasHelp typeTable t_ })
+                        fields
+                , aliasTipe = aliasTipe
+                }
+
+        CanonicalAst.TRecord { fields, alias } ->
+            CanonicalAst.TRecord
+                { fields = Dict.map (\_ v -> dealiasHelp typeTable v) fields
+                , alias = alias
+                }
+
+
+deepDealias : CanonicalAst.Type -> CanonicalAst.Type
+deepDealias t =
+    when t is
+        CanonicalAst.TLambda { from, to } ->
+            CanonicalAst.TLambda
+                { from = deepDealias from
+                , to = deepDealias to
+                }
+
+        CanonicalAst.TVar _ ->
+            t
+
+        CanonicalAst.TType { home, name, vars } ->
+            CanonicalAst.TType
+                { home = home
+                , name = name
+                , vars = Array.map deepDealias vars
+                }
+
+        CanonicalAst.TAlias { fields, aliasTipe } ->
+            deepDealias (dealias fields aliasTipe)
+
+        CanonicalAst.TRecord { fields, alias } ->
+            CanonicalAst.TRecord
+                { fields = Dict.map (\_ v -> deepDealias v) fields
+                , alias = alias
+                }
+
+
 {-| Canonicalize effects.
 -}
-canonicalizeEffects : ParseAst.Effects -> Result Error CanonicalAst.Effects
-canonicalizeEffects effects =
+canonicalizeEffects : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Effects -> Result Error CanonicalAst.Effects
+canonicalizeEffects home scopedTypes parsedLocalTypes effects =
     when effects is
         ParseAst.NoEffects ->
             Ok CanonicalAst.NoEffects
 
-        _ ->
+        ParseAst.Ports ports ->
+            Array.foldl
+                (\p accResult ->
+                    Result.map2
+                        (\canP acc ->
+                            Dict.set p.value.value.name.value canP acc
+                        )
+                        (canonicalizePort home scopedTypes parsedLocalTypes p.value.value)
+                        accResult
+                        
+                )
+                (Ok Dict.empty)
+                ports
+                |> Result.map CanonicalAst.Ports
+
+        ParseAst.Manager _ ->
             Err PlaceholderError
+
+
+canonicalizePort : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Port -> Result Error CanonicalAst.Port
+canonicalizePort moduleName scopedTypes parsedLocalTypes port_ =
+    canonicalizeType moduleName scopedTypes parsedLocalTypes port_.signature
+        |> Result.andThen 
+            (\canType ->
+                when Array.popLast (tipeAsArray (deepDealias canType)) is
+                    -- Cmd/Sub
+                    Just { last = CanonicalAst.TType { home, name, vars = [msg] }, initial } ->
+                        if home == ModuleName.cmd && name == "Cmd" then
+                            when initial is
+                                [] ->
+                                    Err PlaceholderError
+
+                                [ outgoingType ] ->
+                                    when msg is
+                                        CanonicalAst.TVar _ ->
+                                            when checkPayload outgoingType is
+                                                Ok _ ->
+                                                    Ok
+                                                        ( CanonicalAst.Outgoing
+                                                            { freeVars = Set.empty -- TODO
+                                                            , func = canType
+                                                            , payload = outgoingType
+                                                            }
+                                                        )
+
+                                                Err _ ->
+                                                    Err PlaceholderError
+
+                                        _ ->
+                                            Err PlaceholderError
+
+                                _ ->
+                                    Err PlaceholderError
+
+                        else
+                            Err PlaceholderError
+
+                    -- Task ports
+                    Just { last = CanonicalAst.TType { home, name, vars } } ->
+                        Err PlaceholderError
+
+                    _ ->
+                        -- Isn't actually possible
+                        Err PlaceholderError
+            )
+
+
+checkPayload : CanonicalAst.Type -> Result { tipe : CanonicalAst.Type, error : Error } {}
+checkPayload tipe =
+  when tipe is
+    CanonicalAst.TAlias { fields, aliasTipe } ->
+      checkPayload (dealias fields aliasTipe)
+
+    CanonicalAst.TType { home, name, vars } ->
+      when vars is
+        [] ->
+            if
+                (home == ModuleName.jsonEncode && name == "Value")
+                || (home == ModuleName.string && name == "String")
+                || (home == ModuleName.basics && name == "Int")
+                || (home == ModuleName.basics && name == "Float")
+                || (home == ModuleName.basics && name == "Bool")
+                || (home == ModuleName.bytes && name == "Bytes")
+            then
+                Ok {}
+
+            else
+                Err { tipe = tipe, error = PlaceholderError }
+
+        [var] ->
+            if
+                (home == ModuleName.maybe && name == "Maybe")
+                || (home == ModuleName.array && name == "Array")
+            then
+                checkPayload var
+
+            else
+                Err { tipe = tipe, error = PlaceholderError }
+
+        _ ->
+          Err { tipe = tipe, error = PlaceholderError }
+
+    CanonicalAst.TVar _ ->
+      Err { tipe = tipe, error = PlaceholderError }
+
+    CanonicalAst.TLambda _ ->
+      Err { tipe = tipe, error = PlaceholderError }
+
+    CanonicalAst.TRecord { alias = Just _ } ->
+      Err { tipe = tipe, error = PlaceholderError }
+
+    CanonicalAst.TRecord { fields, alias = Nothing } ->
+        Dict.foldl
+            (\_ t accResult ->
+                Result.andThen (\_ -> checkPayload t) accResult
+            )
+            (Ok {})
+            fields
 
 
 type LocalTypeKind

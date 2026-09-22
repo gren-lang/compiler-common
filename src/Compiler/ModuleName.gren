@@ -5,6 +5,15 @@ module Compiler.ModuleName exposing
     , jsonDecoder
     , toString
     , toJson
+    --
+    , basics
+    , bytes
+    , string
+    , jsonEncode
+    , maybe
+    , array
+    , cmd
+    , sub
     )
 
 
@@ -98,3 +107,45 @@ toString (ModuleName name) =
 toJson : ModuleName -> Encode.Value
 toJson moduleName =
     Encode.string (toString moduleName)
+
+
+-- NAMES
+
+basics : ModuleName
+basics =
+    ModuleName "Basics"
+
+
+bytes : ModuleName
+bytes =
+    ModuleName "Bytes"
+
+
+jsonEncode : ModuleName
+jsonEncode =
+    ModuleName "Json.Encode"
+
+
+string : ModuleName
+string =
+    ModuleName "String"
+
+
+maybe : ModuleName
+maybe =
+    ModuleName "Maybe"
+
+
+array : ModuleName
+array =
+    ModuleName "Array"
+
+
+cmd : ModuleName
+cmd =
+    ModuleName "Platform.Cmd"
+
+
+sub : ModuleName
+sub =
+    ModuleName "Platform.Sub"
