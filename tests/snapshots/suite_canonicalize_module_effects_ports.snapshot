@@ -13,6 +13,38 @@ Ok
                 , effects = Ports 
                     (Dict.fromArray 
                         [
+                            { key = "incoming"
+                            , value = Incoming 
+                                { freeVars = Set.fromArray 
+                                    [
+                                    ]
+                                , func = TLambda 
+                                    { from = TLambda 
+                                        { from = TRecord 
+                                            { alias = Nothing
+                                            , fields = Dict.fromArray 
+                                                [
+                                                ] 
+                                            }
+                                        , to = TVar "msg" 
+                                        }
+                                    , to = TType 
+                                        { home = ModuleName "Platform.Sub"
+                                        , name = "Sub"
+                                        , vars = 
+                                            [TVar "msg"
+                                            ] 
+                                        } 
+                                    }
+                                , payload = TRecord 
+                                    { alias = Nothing
+                                    , fields = Dict.fromArray 
+                                        [
+                                        ] 
+                                    } 
+                                } 
+                            }
+                        , 
                             { key = "outgoing"
                             , value = Outgoing 
                                 { freeVars = Set.fromArray 
@@ -101,6 +133,53 @@ Ok
                                     }
                                 ]
                             , name = "Cmd"
+                            , opts = Enum
+                            , vars = 
+                                ["msg"
+                                ] 
+                            } 
+                        }
+                    ] 
+                } 
+            }
+        , 
+            { key = "Platform.Sub"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 20
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Platform.Sub"
+                , package = PackageName 
+                    { author = "gren-lang"
+                    , name = "core" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                        { key = "Sub"
+                        , value = 
+                            { alts = 
+                                [
+                                    { arg = Nothing
+                                    , index = 0
+                                    , name = "Sub" 
+                                    }
+                                ]
+                            , name = "Sub"
                             , opts = Enum
                             , vars = 
                                 ["msg"

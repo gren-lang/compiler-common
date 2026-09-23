@@ -1091,9 +1091,6 @@ canonicalizePort moduleName scopedTypes parsedLocalTypes port_ =
                     Just { last = CanonicalAst.TType { home, name, vars = [msg] }, initial } ->
                         if home == ModuleName.cmd && name == "Cmd" then
                             when initial is
-                                [] ->
-                                    Err PlaceholderError
-
                                 [ outgoingType ] ->
                                     when msg is
                                         CanonicalAst.TVar _ ->
@@ -1109,6 +1106,34 @@ canonicalizePort moduleName scopedTypes parsedLocalTypes port_ =
 
                                                 Err _ ->
                                                     Err PlaceholderError
+
+                                        _ ->
+                                            Err PlaceholderError
+
+                                _ ->
+                                    Err PlaceholderError
+
+                        else if home == ModuleName.sub && name == "Sub" then
+                            when initial is
+                                [ CanonicalAst.TLambda { from = incomingType, to = CanonicalAst.TVar msg1 } ] ->
+                                    when msg is
+                                        CanonicalAst.TVar msg2 ->
+                                            if msg1 /= msg2 then
+                                                Err PlaceholderError
+
+                                            else
+                                                when checkPayload incomingType is
+                                                    Ok _ ->
+                                                        Ok
+                                                            ( CanonicalAst.Incoming
+                                                                { freeVars = Set.empty -- TODO
+                                                                , func = canType
+                                                                , payload = incomingType
+                                                                }
+                                                            )
+
+                                                    Err _ ->
+                                                        Err PlaceholderError
 
                                         _ ->
                                             Err PlaceholderError

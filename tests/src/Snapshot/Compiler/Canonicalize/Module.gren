@@ -353,14 +353,24 @@ tests =
                         type Cmd msg = Cmd
                         """
                       }
+                    , { package = PackageName.core
+                      , source =
+                        """
+                        module Platform.Sub exposing (..)
+
+                        type Sub msg = Sub
+                        """
+                      }
                     , { package = PackageName.example
                       , source =
                         """
                         module Fx exposing (..)
 
                         import Platform.Cmd exposing (Cmd)
+                        import Platform.Sub exposing (Sub)
 
                         port outgoing : {} -> Cmd msg
+                        port incoming : ({} -> msg) -> Sub msg
                         """
                       }
                     ]
