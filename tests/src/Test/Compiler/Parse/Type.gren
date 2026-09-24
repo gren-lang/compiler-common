@@ -63,7 +63,7 @@ tests =
                         , args = []
                         }
                     )
-        , test "Qualified Type (wtih args)" <| \_ ->
+        , test "Qualified Type (with args)" <| \_ ->
             Parser.run PT.parser Context.empty "Main.Module.MyType msg"
                 |> expectExpression
                     (AST.TTypeQual
@@ -75,6 +75,35 @@ tests =
                                 { row = 1, col = 20 }
                                 { row = 1, col = 23 }
                                 (AST.TVar "msg")
+                            ]
+                        }
+                    )
+        , test "Qualified Type (with args 2)" <| \_ ->
+            Parser.run PT.parser Context.empty "Main.Module.MyType My.Value {}"
+                |> expectExpression
+                    (AST.TTypeQual
+                        { varRegion = { start = { row = 1, col = 1 }, end = { row = 1, col = 19 } }
+                        , name = "MyType"
+                        , qualifier = "Main.Module"
+                        , args =
+                            [ SourcePosition.at
+                                { row = 1, col = 20 }
+                                { row = 1, col = 28 }
+                                (AST.TTypeQual
+                                    { varRegion = { start = { row = 1, col = 20 }, end = { row = 1, col = 28 } }
+                                    , name = "Value"
+                                    , qualifier = "My"
+                                    , args = []
+                                    }
+                                )
+                            , SourcePosition.at
+                                { row = 1, col = 29 }
+                                { row = 1, col = 31 }
+                                (AST.TRecord
+                                    { extending = Nothing
+                                    , fields = []
+                                    }
+                                )
                             ]
                         }
                     )

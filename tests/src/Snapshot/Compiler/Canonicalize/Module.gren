@@ -361,6 +361,22 @@ tests =
                         type Sub msg = Sub
                         """
                       }
+                    , { package = PackageName.core
+                      , source =
+                        """
+                        module Platform exposing (..)
+
+                        type Task err ok = Task
+                        """
+                      }
+                    , { package = PackageName.core
+                      , source =
+                        """
+                        module Json.Decode exposing (..)
+
+                        type Value = Value
+                        """
+                      }
                     , { package = PackageName.example
                       , source =
                         """
@@ -368,9 +384,13 @@ tests =
 
                         import Platform.Cmd exposing (Cmd)
                         import Platform.Sub exposing (Sub)
+                        import Platform exposing (Task)
+                        import Json.Decode
 
                         port outgoing : {} -> Cmd msg
                         port incoming : ({} -> msg) -> Sub msg
+                        port onlyin : Task Json.Decode.Value {}
+                        port inout : {} -> Task Json.Decode.Value {}
                         """
                       }
                     ]

@@ -129,7 +129,7 @@ typeArgsParser array =
     Parser.oneOf
         [ Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
             |> Parser.skip (Parser.mapError (\_ -> ExpectedIndent) Space.checkIndent)
-            |> Parser.keep parser
+            |> Parser.keep term
             |> Parser.skip spaceParser
         , Parser.succeed (Parser.Done array)
         ]

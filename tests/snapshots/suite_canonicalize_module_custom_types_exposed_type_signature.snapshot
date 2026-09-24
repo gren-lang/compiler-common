@@ -80,7 +80,12 @@ Ok
                             { home = ModuleName "MyModule"
                             , name = "Maybe"
                             , vars = 
-                                [TVar "a"
+                                [TRecord 
+                                    { alias = Nothing
+                                    , fields = Dict.fromArray 
+                                        [
+                                        ] 
+                                    }
                                 ] 
                             } 
                         } 

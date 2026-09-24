@@ -45,6 +45,89 @@ Ok
                                 } 
                             }
                         , 
+                            { key = "inout"
+                            , value = Task 
+                                { freeVars = Set.fromArray 
+                                    [
+                                    ]
+                                , func = TLambda 
+                                    { from = TRecord 
+                                        { alias = Nothing
+                                        , fields = Dict.fromArray 
+                                            [
+                                            ] 
+                                        }
+                                    , to = TType 
+                                        { home = ModuleName "Platform"
+                                        , name = "Task"
+                                        , vars = 
+                                            [TType 
+                                                { home = ModuleName "Json.Decode"
+                                                , name = "Value"
+                                                , vars = 
+                                                    [
+                                                    ] 
+                                                }
+                                            , TRecord 
+                                                { alias = Nothing
+                                                , fields = Dict.fromArray 
+                                                    [
+                                                    ] 
+                                                }
+                                            ] 
+                                        } 
+                                    }
+                                , input = Just 
+                                    (TRecord 
+                                        { alias = Nothing
+                                        , fields = Dict.fromArray 
+                                            [
+                                            ] 
+                                        }
+                                    )
+                                , payload = TRecord 
+                                    { alias = Nothing
+                                    , fields = Dict.fromArray 
+                                        [
+                                        ] 
+                                    } 
+                                } 
+                            }
+                        , 
+                            { key = "onlyin"
+                            , value = Task 
+                                { freeVars = Set.fromArray 
+                                    [
+                                    ]
+                                , func = TType 
+                                    { home = ModuleName "Platform"
+                                    , name = "Task"
+                                    , vars = 
+                                        [TType 
+                                            { home = ModuleName "Json.Decode"
+                                            , name = "Value"
+                                            , vars = 
+                                                [
+                                                ] 
+                                            }
+                                        , TRecord 
+                                            { alias = Nothing
+                                            , fields = Dict.fromArray 
+                                                [
+                                                ] 
+                                            }
+                                        ] 
+                                    }
+                                , input = Nothing
+                                , payload = TRecord 
+                                    { alias = Nothing
+                                    , fields = Dict.fromArray 
+                                        [
+                                        ] 
+                                    } 
+                                } 
+                            }
+                        , 
                             { key = "outgoing"
                             , value = Outgoing 
                                 { freeVars = Set.fromArray 
@@ -92,6 +175,101 @@ Ok
                     }
                 , unions = Dict.fromArray 
                     [
+                    ] 
+                } 
+            }
+        , 
+            { key = "Json.Decode"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 19
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Json.Decode"
+                , package = PackageName 
+                    { author = "gren-lang"
+                    , name = "core" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                        { key = "Value"
+                        , value = 
+                            { alts = 
+                                [
+                                    { arg = Nothing
+                                    , index = 0
+                                    , name = "Value" 
+                                    }
+                                ]
+                            , name = "Value"
+                            , opts = Enum
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    ] 
+                } 
+            }
+        , 
+            { key = "Platform"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = NoEffects
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 16
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 8
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Platform"
+                , package = PackageName 
+                    { author = "gren-lang"
+                    , name = "core" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                        { key = "Task"
+                        , value = 
+                            { alts = 
+                                [
+                                    { arg = Nothing
+                                    , index = 0
+                                    , name = "Task" 
+                                    }
+                                ]
+                            , name = "Task"
+                            , opts = Enum
+                            , vars = 
+                                ["err"
+                                , "ok"
+                                ] 
+                            } 
+                        }
                     ] 
                 } 
             }

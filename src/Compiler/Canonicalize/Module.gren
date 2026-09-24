@@ -1145,8 +1145,49 @@ canonicalizePort moduleName scopedTypes parsedLocalTypes port_ =
                             Err PlaceholderError
 
                     -- Task ports
-                    Just { last = CanonicalAst.TType { home, name, vars } } ->
-                        Err PlaceholderError
+                    Just { last = CanonicalAst.TType { home, name, vars }, initial } ->
+                        if home == ModuleName.platform && name == "Task" then
+                            when vars is
+                                [ errorType, incomingType ] ->
+                                    when { errorV = checkTaskError errorType, typeV = checkPayload incomingType } is
+                                        { errorV = True, typeV = Ok _ } ->
+                                            when initial is
+                                                [] ->
+                                                    Ok
+                                                        ( CanonicalAst.Task
+                                                            { freeVars = Set.empty -- TODO
+                                                            , func = canType
+                                                            , input = Nothing
+                                                            , payload = incomingType
+                                                            }
+                                                        )
+
+                                                [ outgoing ] ->
+                                                    when checkPayload outgoing is
+                                                        Ok _ ->
+                                                            Ok
+                                                                ( CanonicalAst.Task
+                                                                    { freeVars = Set.empty -- TODO
+                                                                    , func = canType
+                                                                    , input = Just outgoing
+                                                                    , payload = incomingType
+                                                                    }
+                                                                )
+
+                                                        Err _ ->
+                                                            Err PlaceholderError
+
+                                                _ ->
+                                                    Err PlaceholderError
+
+                                        _ ->
+                                            Err PlaceholderError
+
+                                _ ->
+                                    Err PlaceholderError
+
+                        else
+                            Err PlaceholderError
 
                     _ ->
                         -- Isn't actually possible
@@ -1207,6 +1248,16 @@ checkPayload tipe =
             fields
 
 
+checkTaskError : CanonicalAst.Type -> Bool
+checkTaskError tipe =
+  when tipe is
+    CanonicalAst.TType { home, name, vars = [] } ->
+        home == ModuleName.jsonDecode && name == "Value"
+
+    _ ->
+        False
+
+
 type LocalTypeKind
     = CustomType (Array String)
     | TypeAlias ParseAst.Alias
@@ -1225,64 +1276,177 @@ canonicalizeType home scopedTypes parsedLocalTypes tipe =
             Ok (CanonicalAst.TVar name)
 
         ParseAst.TType { name, args } ->
-            -- TODO: args
-            when Dict.get name.value scopedTypes.unqualified is
-                Just { first = t, rest = [] } ->
-                    Ok t
+            let
+                canArgsResult =
+                    Array.foldl
+                        (\t accResult ->
+                            Result.andThen
+                                (\acc ->
+                                    canonicalizeType home scopedTypes parsedLocalTypes t
+                                        |> Result.map (\canT -> Array.pushLast canT acc)
+                                )
+                                accResult
+                        )
+                        (Ok [])
+                        args
+            in
+            when canArgsResult is
+                Err err ->
+                    Err err
 
-                -- TODO: handle duplicates
-                Just _ ->
-                    Err PlaceholderError
+                Ok canArgs ->
+                    when Dict.get name.value scopedTypes.unqualified is
+                        Just { first = CanonicalAst.TType data, rest = [] } ->
+                            if Array.length data.vars /= Array.length canArgs then
+                                Err PlaceholderError
 
-                Nothing ->
-                    when Dict.get name.value parsedLocalTypes is
-                        Just (TypeAlias alias) ->
-                            canonicalizeType home scopedTypes parsedLocalTypes alias.type_
-                                |> Result.map
-                                    (\canType ->
-                                        CanonicalAst.TAlias
-                                            { home = home
-                                            , name = name.value
-                                            -- TODO: can args
-                                            , fields =
-                                                Array.map
-                                                    (\v ->
-                                                        { name = v.value
-                                                        , tipe = CanonicalAst.TVar v.value
-                                                        }
-                                                    )
-                                                    alias.vars
-                                            , aliasTipe = CanonicalAst.Holey canType
-                                            }
+                            else
+                                Ok
+                                    (CanonicalAst.TType
+                                        { home = data.home
+                                        , name = data.name
+                                        , vars = canArgs
+                                        }
                                     )
 
-                        Just (CustomType vars) ->
-                            Ok
-                                (CanonicalAst.TType
-                                    { home = home
-                                    , name = name.value
-                                    -- TODO: use provided args, only use type vars to verify arity
-                                    , vars = Array.map CanonicalAst.TVar vars
-                                    }
+                        Just { first = CanonicalAst.TAlias data, rest = [] } ->
+                            if Array.length data.fields /= Array.length canArgs then
+                                Err PlaceholderError
+
+                            else
+                                Ok
+                                    (CanonicalAst.TAlias
+                                        { home = data.home
+                                        , name = data.name
+                                        , fields =
+                                            Array.map2
+                                                (\f t -> { name = f.name , tipe = t })
+                                                data.fields
+                                                canArgs
+                                        , aliasTipe = data.aliasTipe
+                                        }
+                                    )
+
+                        Just { first = t, rest = [] } ->
+                            if Array.length canArgs /= 0 then
+                                Err PlaceholderError
+
+                            else
+                                Ok t
+
+                        -- TODO: handle duplicates
+                        Just _ ->
+                            Err PlaceholderError
+
+                        Nothing ->
+                            when Dict.get name.value parsedLocalTypes is
+                                Just (TypeAlias alias) ->
+                                    if Array.length alias.vars /= Array.length canArgs then
+                                        Err PlaceholderError
+
+                                    else
+                                        canonicalizeType home scopedTypes parsedLocalTypes alias.type_
+                                            |> Result.map
+                                                (\canType ->
+                                                    CanonicalAst.TAlias
+                                                        { home = home
+                                                        , name = name.value
+                                                        , fields =
+                                                            Array.map2
+                                                                (\v t ->
+                                                                    { name = v.value
+                                                                    , tipe = t
+                                                                    }
+                                                                )
+                                                                alias.vars
+                                                                canArgs
+                                                        , aliasTipe = CanonicalAst.Holey canType
+                                                        }
+                                                )
+
+                                Just (CustomType vars) ->
+                                    if Array.length vars /= Array.length canArgs then
+                                        Err PlaceholderError
+
+                                    else
+                                        Ok
+                                            (CanonicalAst.TType
+                                                { home = home
+                                                , name = name.value
+                                                , vars = canArgs
+                                                }
+                                            )
+
+                                Nothing ->
+                                    Err PlaceholderError
+
+        ParseAst.TTypeQual { varRegion, qualifier, name, args } ->
+            let
+                canArgsResult =
+                    Array.foldl
+                        (\t accResult ->
+                            Result.andThen
+                                (\acc ->
+                                    canonicalizeType home scopedTypes parsedLocalTypes t
+                                        |> Result.map (\canT -> Array.pushLast canT acc)
                                 )
+                                accResult
+                        )
+                        (Ok [])
+                        args
+            in
+            when canArgsResult is
+                Err err ->
+                    Err err
+
+                Ok canArgs ->
+                    when Dict.get qualifier scopedTypes.qualified is
+                        Just inMod ->
+                            when Dict.get name inMod is
+                                Just { first = CanonicalAst.TType data, rest = [] } ->
+                                    if Array.length data.vars /= Array.length canArgs then
+                                        Err PlaceholderError
+
+                                    else
+                                        Ok
+                                            (CanonicalAst.TType
+                                                { home = data.home
+                                                , name = data.name
+                                                , vars = canArgs
+                                                }
+                                            )
+
+                                Just { first = CanonicalAst.TAlias data, rest = [] } ->
+                                    if Array.length data.fields /= Array.length canArgs then
+                                        Err PlaceholderError
+
+                                    else
+                                        Ok
+                                            (CanonicalAst.TAlias
+                                                { home = data.home
+                                                , name = data.name
+                                                , fields =
+                                                    Array.map2
+                                                        (\f t -> { name = f.name , tipe = t })
+                                                        data.fields
+                                                        canArgs
+                                                , aliasTipe = data.aliasTipe
+                                                }
+                                            )
+
+                                Just { first = t, rest = [] } ->
+                                    if Array.length canArgs /= 0 then
+                                        Err PlaceholderError
+
+                                    else
+                                        Ok t
+
+                                -- TODO: handle duplicates
+                                _ ->
+                                    Err PlaceholderError
 
                         Nothing ->
                             Err PlaceholderError
-
-        ParseAst.TTypeQual { varRegion, qualifier, name, args } ->
-            -- TODO: args
-            when Dict.get qualifier scopedTypes.qualified is
-                Just inMod ->
-                    when Dict.get name inMod is
-                        Just { first = t, rest = [] } ->
-                            Ok t
-
-                        -- TODO: handle duplicates
-                        _ ->
-                            Err PlaceholderError
-
-                Nothing ->
-                    Err PlaceholderError
 
         ParseAst.TRecord { fields, extending } ->
             let

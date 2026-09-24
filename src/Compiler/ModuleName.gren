@@ -10,6 +10,8 @@ module Compiler.ModuleName exposing
     , bytes
     , string
     , jsonEncode
+    , jsonDecode
+    , platform
     , maybe
     , array
     , cmd
@@ -124,6 +126,16 @@ bytes =
 jsonEncode : ModuleName
 jsonEncode =
     ModuleName "Json.Encode"
+
+
+jsonDecode : ModuleName
+jsonDecode =
+    ModuleName "Json.Decode"
+
+
+platform : ModuleName
+platform =
+    ModuleName "Platform"
 
 
 string : ModuleName
