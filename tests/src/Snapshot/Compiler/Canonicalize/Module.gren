@@ -251,6 +251,28 @@ tests =
                       }
                     ]
                     |> Snapshot.this
+            , test "Qualified alias through module alias" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
+
+                        type alias Person = { name : str }
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module Main exposing (..)
+
+                        import MyModule as M
+
+                        type alias AliasedPerson = M.Person
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
             , test "Alias of custom type" <| \_ ->
                 canonicalize
                     [ { package = PackageName.example
