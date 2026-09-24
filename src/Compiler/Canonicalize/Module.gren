@@ -257,11 +257,14 @@ canonicalizeModuleContent realName pkg parsedModule context =
 
                                 Just canMod ->
                                     let
+                                        aliasedHome =
+                                            Maybe.withDefault canMod.name imp.alias
+
                                         aliases =
                                             Dict.foldl
                                                 (\name ali acc ->
                                                     Array.pushLast
-                                                        { home = canMod.name
+                                                        { home = aliasedHome
                                                         , name = name
                                                         , tipe =
                                                             (CanonicalAst.TAlias
@@ -288,7 +291,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                             Dict.foldl
                                                 (\name union acc ->
                                                     Array.pushLast
-                                                        { home = canMod.name
+                                                        { home = aliasedHome
                                                         , name = name
                                                         , tipe =
                                                             (CanonicalAst.TType
@@ -304,8 +307,9 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                                 canMod.unions
 
                                         scopedEntriesQualified =
+                                            -- doesn't respect module exports
                                             Array.foldl
-                                                (\t acc -> ScopedEntries.addQualified t.home t.name t.tipe acc)
+                                                (\t acc -> ScopedEntries.addQualified t.home t.name t.tipe acc )
                                                 ScopedEntries.empty
                                                 entries
 
@@ -317,6 +321,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                                 CanonicalAst.ExportEverything _ ->
                                                     entries
                                     in
+                                    -- doesn't respect import exposing
                                     Array.foldl
                                         (\t acc -> ScopedEntries.add t.name t.tipe acc)
                                         scopedEntriesQualified
@@ -1077,8 +1082,31 @@ canonicalizeEffects home scopedTypes parsedLocalTypes effects =
                 ports
                 |> Result.map CanonicalAst.Ports
 
-        ParseAst.Manager _ ->
-            Err PlaceholderError
+        ParseAst.Manager m ->
+            -- TODO: Verify existance of required values
+            let
+                emptyReg =
+                    { start = SourcePosition.emptyPos
+                    , end = SourcePosition.emptyPos
+                    }
+            in
+            Ok
+                (CanonicalAst.Manager
+                    { reg1 = emptyReg
+                    , reg2 = emptyReg
+                    , reg3 = emptyReg
+                    , manager =
+                        when m is
+                            ParseAst.Sub sub ->
+                                CanonicalAst.Sub sub.value
+
+                            ParseAst.Cmd cmd ->
+                                CanonicalAst.Cmd cmd.value
+
+                            ParseAst.Fx { cmd, sub } ->
+                                CanonicalAst.Fx { cmd = cmd.value, sub = sub.value }
+                    }
+                )
 
 
 canonicalizePort : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Port -> Result Error CanonicalAst.Port

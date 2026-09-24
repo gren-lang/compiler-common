@@ -1,0 +1,106 @@
+Ok 
+    { modules = Dict.fromArray 
+        [
+            { key = "Fx"
+            , value = 
+                { aliases = Dict.fromArray 
+                    [
+                    ]
+                , binops = Dict.fromArray 
+                    [
+                    ]
+                , decls = SaveTheEnvironment
+                , effects = Manager 
+                    { manager = Fx 
+                        { cmd = "MyCmd"
+                        , sub = "MySub" 
+                        }
+                    , reg1 = 
+                        { end = 
+                            { col = 1
+                            , row = 1 
+                            }
+                        , start = 
+                            { col = 1
+                            , row = 1 
+                            } 
+                        }
+                    , reg2 = 
+                        { end = 
+                            { col = 1
+                            , row = 1 
+                            }
+                        , start = 
+                            { col = 1
+                            , row = 1 
+                            } 
+                        }
+                    , reg3 = 
+                        { end = 
+                            { col = 1
+                            , row = 1 
+                            }
+                        , start = 
+                            { col = 1
+                            , row = 1 
+                            } 
+                        } 
+                    }
+                , exports = ExportEverything 
+                    { end = 
+                        { col = 17
+                        , row = 1 
+                        }
+                    , start = 
+                        { col = 15
+                        , row = 1 
+                        } 
+                    }
+                , name = ModuleName "Fx"
+                , package = PackageName 
+                    { author = "example"
+                    , name = "package" 
+                    }
+                , unions = Dict.fromArray 
+                    [
+                        { key = "MyCmd"
+                        , value = 
+                            { alts = 
+                                [
+                                    { arg = Nothing
+                                    , index = 0
+                                    , name = "Cmd" 
+                                    }
+                                ]
+                            , name = "MyCmd"
+                            , opts = Enum
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    , 
+                        { key = "MySub"
+                        , value = 
+                            { alts = 
+                                [
+                                    { arg = Nothing
+                                    , index = 0
+                                    , name = "Sub" 
+                                    }
+                                ]
+                            , name = "MySub"
+                            , opts = Enum
+                            , vars = 
+                                [
+                                ] 
+                            } 
+                        }
+                    ] 
+                } 
+            }
+        ]
+    , signatures = Dict.fromArray 
+        [
+        ] 
+    }

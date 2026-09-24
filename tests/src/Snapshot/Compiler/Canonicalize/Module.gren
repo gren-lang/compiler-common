@@ -417,7 +417,20 @@ tests =
                       }
                     ]
                     |> Snapshot.this
-            -- TODO: effects
+            , test "Manager" <| \_ ->
+                -- TODO: missing structure, cmd only, sub only
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        effect module Fx where { subscription = MySub, command = MyCmd } exposing (..)
+
+                        type MyCmd = Cmd
+                        type MySub = Sub
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
             ]
         , describe "Parametric modules"
             [ test "Declaration" <| \_ ->
