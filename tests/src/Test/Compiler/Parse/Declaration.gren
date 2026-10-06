@@ -4,6 +4,8 @@ import Expect exposing (Expectation)
 import Test exposing (Test, describe, test, fuzz)
 import String.Parser.Advanced as Parser
 import Compiler.Parse.Declaration as PD
+import Compiler.Parse.Variable as Var
+import Compiler.Parse.Expression as Expr
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Ast.Source as AST
 import Compiler.Parse.Context as Context
@@ -187,6 +189,13 @@ tests =
                                     )
                             }
                         )
+            , test "Should fail if it doesn't start at col 1" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| docs -}
+                      type alias Person = Worker
+                    """
+                    |> expectErr PD.ExpectedColumnOne
             ]
         , describe "type union"
             [ test "Simple case" <| \_ ->
@@ -323,6 +332,14 @@ tests =
                                 ]
                             }
                         )
+            , test "Should fail if it doesn't start at col 1" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| docs -}
+                      type Person
+                        = Worker
+                    """
+                    |> expectErr PD.ExpectedColumnOne
             ]
         , describe "Values"
             [ test "Simple case" <| \_ ->
@@ -553,6 +570,29 @@ tests =
                                     )
                             }
                         )
+            , test "Should fail if it doesn't start at col 1" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| docs -}
+                     person = 1
+                    """
+                    |> expectErr PD.ExpectedColumnOne
+            , test "Should fail if type doesn't start at col 1" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| docs -}
+                     person : Int
+                    person = 1
+                    """
+                    |> expectErr PD.ExpectedColumnOne
+            , test "Should fail if impl doesn't start at col 1" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| docs -}
+                    person : Int
+                     person = 1
+                    """
+                    |> expectErr (PD.ExprError (Expr.VariableError Var.InvalidCharacter))
             ]
         , describe "Ports"
             [ test "Simple case" <| \_ ->
@@ -582,6 +622,13 @@ tests =
                                     )
                             }
                         )
+            , test "fails if not defined at column 1" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| docs -}
+                     port myOutput : String
+                    """
+                    |> expectErr PD.ExpectedColumnOne
             , test "Should stop parsing after type union, not consume following value" <| \_ ->
                 Parser.run PD.parser Context.empty
                     """
@@ -635,6 +682,16 @@ expect expected result =
 
         Ok decl ->
             Expect.equal expected decl.value
+
+
+expectErr : PD.Error -> Result (Array (Parser.DeadEnd c PD.Error)) PD.Declaration -> Expectation
+expectErr expected result =
+    when result is
+        Err errs ->
+            Expect.all (Array.map (\err {} -> Expect.equal expected err.problem) errs) {}
+
+        Ok decl ->
+            Expect.fail ("Expected failure: " ++ Debug.toString decl)
 
 
 expectDoc : SourcePosition.Located String -> PD.DeclarationValue -> Result (Array (Parser.DeadEnd c e)) PD.Declaration -> Expectation

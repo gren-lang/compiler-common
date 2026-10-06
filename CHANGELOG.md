@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Accept the same upper- and lowercase variable names that the haskell based parser does
+- Top-level declarations now has to start at column 1
 
 ## [3.0.0] - 2026-06-22
 

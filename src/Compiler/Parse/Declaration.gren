@@ -53,6 +53,7 @@ type Error
     | ExprError Expr.Error
     | SpaceError Space.Error
     | IndentationError
+    | ExpectedColumnOne
 
 
 {-| Returns a human-readable description of an `Error`.
@@ -81,6 +82,9 @@ errorToString error =
         IndentationError ->
             "Expected more indentation than above line"
 
+        ExpectedColumnOne ->
+            "Expected to find a declaration here"
+
 
 spaceParser : Parser Context Error {}
 spaceParser =
@@ -100,6 +104,7 @@ parser =
             }
         )
         |> Parser.keep (docParser ExpectedKeyword)
+        |> Parser.skip (Space.checkStartOfLine ExpectedColumnOne)
         |> Parser.keep
             (Parser.oneOf
                 [ typeParser

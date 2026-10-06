@@ -3,6 +3,7 @@ module Compiler.Parse.Space exposing
     , parser
     , scopeIndentToLineStart
     , checkIndent
+    , checkStartOfLine
     , errorToString
     )
 
@@ -173,4 +174,19 @@ checkIndent =
 
                 else
                     Parser.problem {}
+            )
+
+
+{-| Check that we're at the start of a line
+-}
+checkStartOfLine : err -> Parser Context err {}
+checkStartOfLine err =
+    Parser.getCol
+        |> Parser.andThen
+            (\ col ->
+                if col == 1 then
+                    Parser.succeed {}
+
+                else
+                    Parser.problem err
             )
