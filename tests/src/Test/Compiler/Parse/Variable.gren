@@ -27,6 +27,15 @@ tests =
             , test "no emojis" <| \_ ->
                 Parser.run PV.lowerCase Context.empty "hey🫵"
                     |> Expect.equal (Ok "hey")
+            , test "unicode lt" <| \_ ->
+                Parser.run PV.lowerCase Context.empty "xǅ"
+                    |> Expect.equal (Ok "xǅ")
+            , test "unicode lm" <| \_ ->
+                Parser.run PV.lowerCase Context.empty "xʰ"
+                    |> Expect.equal (Ok "xʰ")
+            , test "unicode lo" <| \_ ->
+                Parser.run PV.lowerCase Context.empty "x中"
+                    |> Expect.equal (Ok "x中")
             , test "cannot start with digit" <| \_ ->
                 Parser.run PV.lowerCase Context.empty "1month"
                     |> expectErr PV.InvalidCharacter
@@ -55,6 +64,9 @@ tests =
             , test "no emojis" <| \_ ->
                 Parser.run PV.upperCase Context.empty "Hey🫵"
                     |> Expect.equal (Ok "Hey")
+            , test "unicode Lt" <| \_ ->
+                Parser.run PV.upperCase Context.empty "ǅa"
+                    |> Expect.equal (Ok "ǅa")
             , test "cannot start with digit" <| \_ ->
                 Parser.run PV.upperCase Context.empty "1month"
                     |> expectErr PV.InvalidCharacter

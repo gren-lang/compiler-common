@@ -57,8 +57,6 @@ is one of the reserved words.
 -}
 lowerCase : Parser Context Error String
 lowerCase =
-    -- TODO: simply stops parsing at invalid character, in lack of better alternatives
-    -- Revisit this once gren-lang/parser has gotten more flexible
     Parser.succeed {}
         |> Parser.skip (Parser.chompIf isLowerCaseLetter InvalidCharacter)
         |> Parser.skip (Parser.chompWhile isInner)
@@ -237,7 +235,7 @@ isLowerCaseLetter char =
 
 upperCaseLetterRegex : Regex
 upperCaseLetterRegex =
-    Regex.fromString "\\p{Lu}"
+    Regex.fromString "[\\p{Lu}\\p{Lt}]"
         |> Maybe.withDefault Regex.never
 
 
@@ -247,9 +245,20 @@ isUpperCaseLetter char =
         |> Regex.contains upperCaseLetterRegex
 
 
+unicodeLetterRegex : Regex
+unicodeLetterRegex =
+    Regex.fromString "\\p{L}"
+        |> Maybe.withDefault Regex.never
+
+
+isUnicodeLetter : Char -> Bool
+isUnicodeLetter char =
+    String.fromChar char
+        |> Regex.contains unicodeLetterRegex
+
+
 isInner : Char -> Bool
 isInner char =
     Char.isAlphaNum char
         || char == '_'
-        || isLowerCaseLetter char
-        || isUpperCaseLetter char
+        || isUnicodeLetter char
