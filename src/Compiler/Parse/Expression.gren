@@ -689,6 +689,9 @@ term =
                     AST.Record _ ->
                         accessible expr
 
+                    AST.Update _ ->
+                        accessible expr
+
                     AST.Parens _ ->
                         accessible expr
 

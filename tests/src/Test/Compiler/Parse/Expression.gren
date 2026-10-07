@@ -134,6 +134,46 @@ tests =
                                 }
                             )
                         )
+            , test "accessor after extensible record literal" <| \_ ->
+                Parser.run PE.parser Context.empty "{ rec | a = 1 }.a"
+                    |> expectLocatedExpression
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 1, col = 18 }
+                            (AST.Access
+                                { expression =
+                                    SourcePosition.at
+                                        { row = 1, col = 1 }
+                                        { row = 1, col = 16 }
+                                        (AST.Update
+                                            { record =
+                                                SourcePosition.at
+                                                { row = 1, col = 3 }
+                                                { row = 1, col = 6 }
+                                                (AST.Var
+                                                    { varType = AST.LowVar
+                                                    , name = "rec"
+                                                    }
+                                                )
+                                            , newValues =
+                                                [ { field =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 9 }
+                                                            { row = 1, col = 10 }
+                                                            "a"
+                                                  , value =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 13 }
+                                                            { row = 1, col = 14 }
+                                                            (AST.NumberLiteral (Number.Integer 1))
+                                                  }
+                                                ]
+                                            }
+                                        )
+                                , accessor = "a"
+                                }
+                            )
+                        )
             , test "function calls" <| \_ ->
                 Parser.run PE.parser Context.empty "func a b"
                     |> expectExpression
