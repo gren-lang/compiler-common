@@ -185,7 +185,7 @@ argOrOperatorLoop state =
                         Parser.getPosition
                             |> Parser.andThen
                                 (\pos ->
-                                    if operator.end.col == pos.col then
+                                    if operator.end.col == pos.col && operator.end.row == pos.row then
                                         -- negated term (no space after operator)
                                         Parser.succeed (\term_ -> Parser.Loop <| pushStateArg (SourcePosition.at operator.start term_.end (AST.Negate term_)) state)
                                             |> Parser.skip checkIndent
