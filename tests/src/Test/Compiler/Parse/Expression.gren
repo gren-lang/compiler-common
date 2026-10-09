@@ -221,6 +221,64 @@ tests =
                                 ]
                             }
                         )
+            , test "function call over multiple lines (wierd indentation)" <| \_ ->
+                Parser.run PE.parser Context.empty
+                    """
+                    let
+                        res =
+                            func
+                            a
+                            b
+                    in
+                    res
+                    """
+                    |> expectExpression
+                        (AST.Let
+                            { body =
+                                { end = { col = 4, row = 7 }
+                                , start = { col = 1, row = 7 }
+                                , value = AST.Var { name = "res" , varType = AST.LowVar }
+                                }
+                            , defs =
+                                [ { end = { col = 10, row = 5 }
+                                  , start = { col = 5, row = 2 }
+                                  , value =
+                                        AST.Define
+                                            { args = []
+                                            , body =
+                                                { end = { col = 10, row = 5 }
+                                                , start = { col = 9, row = 3 }
+                                                , value =
+                                                    AST.Call
+                                                        { args =
+                                                            [ { end = { col = 10, row = 4 }
+                                                              , start = { col = 9, row = 4 }
+                                                              , value = AST.Var { name = "a" , varType = AST.LowVar }
+                                                              }
+                                                            , { end = { col = 10, row = 5 }
+                                                              , start = { col = 9, row = 5 }
+                                                              , value = AST.Var { name = "b", varType = AST.LowVar }
+                                                              }
+                                                            ]
+                                                        , fn =
+                                                            { end = { col = 13, row = 3 }
+                                                            , start = { col = 9, row = 3 }
+                                                            , value =
+                                                                AST.Var { name = "func" , varType = AST.LowVar }
+                                                            }
+                                                        }
+                                                }
+                                            , name =
+                                                { end = { col = 8, row = 2 }
+                                                , start = { col = 5, row = 2 }
+                                                , value = "res"
+                                                }
+                                            , typeSignature = Nothing
+                                            }
+                                  }
+                                ]
+                            }
+                        )
             , test "function calls (with parens)" <| \_ ->
                 Parser.run PE.parser Context.empty "foo a (bar b)"
                     |> expectExpression
@@ -1359,6 +1417,16 @@ tests =
                                     ]
                                 }
                             )
+                , test "each branch must be indented greater than the branch guard" <| \_ ->
+                    Parser.run PE.parser Context.empty
+                        """
+                        when myVar is
+                            A ->
+                            'a'
+                            B ->
+                           'b'
+                        """
+                        |> expectErr PE.IndentError
                 , test "with destructuring" <| \_ ->
                     Parser.run PE.parser Context.empty "when myVar is { x = y } -> x"
                         |> expectExpression
@@ -1878,6 +1946,26 @@ tests =
                                         (AST.Var { name = "number", varType = AST.LowVar })
                                 }
                             )
+                , test "Values must be indented in line with name" <| \_ ->
+                    Parser.run PE.parser Context.empty
+                        """
+                        let
+                            number =
+                        1
+                        in
+                        number
+                        """
+                        |> expectErr PE.IndentError
+                , test "Values must be indented in line with function name" <| \_ ->
+                    Parser.run PE.parser Context.empty
+                        """
+                        let
+                            number a =
+                        foo
+                        in
+                        number
+                        """
+                        |> expectErr PE.IndentError
                 , test "Destructuring" <| \_ ->
                     Parser.run PE.parser Context.empty
                         """

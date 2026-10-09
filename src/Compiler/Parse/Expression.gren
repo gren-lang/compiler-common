@@ -202,7 +202,7 @@ argOrOperatorLoop state =
                 )
                 |> Parser.skip spaceParser
         , Parser.succeed (\arg -> Parser.Loop <| pushStateArg arg state)
-            |> Parser.skip checkIndent
+            |> Parser.skip checkIndentAtLeastEqual
             |> Parser.keep term
             |> Parser.skip spaceParser
         , Parser.succeed (Parser.Done state)
@@ -392,7 +392,8 @@ letDefNamedParser =
                         (\nextValue payload -> { payload | indent = nextValue })
                     |> Parser.keep (Parser.loop [] (functionArgsParser "="))
                     |> Parser.skip spaceParser
-                    |> Parser.keep (Parser.lazy (\_ -> parser))
+                    |> Parser.skip checkIndent
+                    |> Parser.keep (Space.scopeIndentToCurrentColumn (Parser.lazy (\_ -> parser)))
             )
 
 
@@ -512,6 +513,7 @@ whenParser =
             )
         |> Space.scopeIndentToLineStart
 
+
 whenBranchParser : Parser Context Error AST.WhenBranch
 whenBranchParser =
     Parser.succeed (\pattern body -> { pattern = pattern, body = body })
@@ -519,7 +521,8 @@ whenBranchParser =
         |> Parser.skip spaceParser
         |> Parser.skip (Parser.keyword "->" (ExpectedKeyword "->"))
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip checkIndent
+        |> Parser.keep (Space.scopeIndentToCurrentColumn (Parser.lazy (\_ -> parser)))
         |> Space.scopeIndentToLineStart
 
 
@@ -875,3 +878,8 @@ spaceParser =
 checkIndent : Parser Context Error {}
 checkIndent =
     Parser.mapError (\_ -> IndentError) Space.checkIndent
+
+
+checkIndentAtLeastEqual : Parser Context Error {}
+checkIndentAtLeastEqual =
+    Parser.mapError (\_ -> IndentError) Space.checkIndentAtLeastEqual

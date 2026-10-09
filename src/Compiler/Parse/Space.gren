@@ -2,7 +2,9 @@ module Compiler.Parse.Space exposing
     ( Error (..)
     , parser
     , scopeIndentToLineStart
+    , scopeIndentToCurrentColumn
     , checkIndent
+    , checkIndentAtLeastEqual
     , checkStartOfLine
     , errorToString
     )
@@ -14,7 +16,7 @@ module Compiler.Parse.Space exposing
 
 ## Indentation helpers
 
-@docs scopeIndentToLineStart, checkIndent
+@docs scopeIndentToLineStart, scopeIndentToCurrentColumn, checkIndent, checkIndentAtLeastEqual, checkStartOfLine
 -}
 
 
@@ -155,26 +157,55 @@ scopeIndentToLineStart p =
         .indent
         (\newIndent payload -> { payload | indent = newIndent })
         p
+
+
+{-| This will set `Context.indent` to the current column for the duration of
+the provided parser.
+-}
+scopeIndentToCurrentColumn : Parser Context e v -> Parser Context e v
+scopeIndentToCurrentColumn p =
+    Parser.getCol
+        |> Parser.andThen
+            (\col ->
+                Parser.scopedUpdatePayload
+                    (\_ -> col)
+                    .indent
+                    (\newIndent payload -> { payload | indent = newIndent })
+                    p
+            )
     
 
 {-| Use this to check that the current indentation is valid. That is, the current
-column has to be greater than `Context.indent`.
+column has to be _greater_ than `Context.indent`.
 
 This allows you to stop parsing when the indentation level decreases.
 -}
 checkIndent : Parser Context {} {}
 checkIndent =
+    checkIndentHelper (\indent col -> col > indent)
+
+
+checkIndentHelper : (Int -> Int -> Bool) -> Parser Context {} {}
+checkIndentHelper check =
     Parser.succeed (\indent col -> { indent = indent, col = col })
         |> Parser.keep (Parser.map .indent Parser.getPayload)
         |> Parser.keep Parser.getCol
         |> Parser.andThen
             (\{ indent, col } ->
-                if col > indent then
+                if check indent col then
                     Parser.succeed {}
 
                 else
                     Parser.problem {}
             )
+
+
+{-| Same as `checkIndent` but additionally accepts an indentation _equal_ to the
+set indentation level
+-}
+checkIndentAtLeastEqual : Parser Context {} {}
+checkIndentAtLeastEqual =
+    checkIndentHelper (\indent col -> col >= indent && col > 1)
 
 
 {-| Check that we're at the start of a line
