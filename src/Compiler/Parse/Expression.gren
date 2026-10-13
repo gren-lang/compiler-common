@@ -292,10 +292,10 @@ operatorParser =
 letParser : Parser Context Error AST.Expression
 letParser =
     Parser.succeed
-        (\start firstDef defs body end ->
+        (\start firstDef defs body ->
             SourcePosition.at
                 start
-                end
+                body.end
                 (AST.Let
                     { defs = Array.pushFirst firstDef defs
                     , body = body
@@ -310,7 +310,6 @@ letParser =
         |> Parser.keep (Parser.loop [] letDefLoopParser)
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
-        |> Parser.keep Parser.getPosition
 
 
 letDefParser : Parser Context Error (SourcePosition.Located AST.Def)
