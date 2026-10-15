@@ -264,7 +264,13 @@ variantParser =
             (Parser.oneOf
                 [ Parser.succeed Just
                     |> Parser.skip (Parser.mapError (\_ -> IndentationError) Space.checkIndent)
+                    |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
+                    |> Parser.skip spaceParser
                     |> Parser.keep (Parser.mapError TypeError Type.expression)
+                    |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+                , Parser.succeed Just
+                    |> Parser.skip (Parser.mapError (\_ -> IndentationError) Space.checkIndent)
+                    |> Parser.keep (Parser.mapError TypeError Type.term)
                 , Parser.succeed Nothing
                 ]
             )

@@ -277,7 +277,7 @@ type alias Value =
   , signature :
     Maybe
       { start : SourcePosition.Position
-      , type_ : SourcePosition.Located Type_
+      , type_ : Type
       }
   , args : Array Pattern
   , body : Expression

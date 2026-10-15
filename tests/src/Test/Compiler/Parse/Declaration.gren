@@ -332,6 +332,101 @@ tests =
                                 ]
                             }
                         )
+            , test "Stops parsing after first variant arg" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    type Person
+                        = Worker Int Float
+                    """
+                    |> expect
+                        (PD.Union
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 12 }
+                                    "Person"
+                            , vars = []
+                            , variants =
+                                [ SourcePosition.at
+                                    { row = 2, col = 7 }
+                                    { row = 2, col = 17 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 2, col = 7 }
+                                            { row = 2, col = 13 }
+                                            "Worker"
+                                    , payload =
+                                        Just <|
+                                            SourcePosition.at
+                                                { row = 2, col = 14 }
+                                                { row = 2, col = 17 }
+                                                (AST.TType
+                                                    { name =
+                                                        SourcePosition.at
+                                                            { row = 2, col = 14 }
+                                                            { row = 2, col = 17 }
+                                                            "Int"
+                                                    , args = []
+                                                    }
+                                                )
+                                    }
+                                ]
+                            }
+                        )
+            , test "Parens is required for type args" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    type Person
+                        = Worker (Bar Float)
+                    """
+                    |> expect
+                        (PD.Union
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 12 }
+                                    "Person"
+                            , vars = []
+                            , variants =
+                                [ SourcePosition.at
+                                    { row = 2, col = 7 }
+                                    { row = 2, col = 24 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 2, col = 7 }
+                                            { row = 2, col = 13 }
+                                            "Worker"
+                                    , payload =
+                                        Just <|
+                                            SourcePosition.at
+                                                { row = 2, col = 15 }
+                                                { row = 2, col = 24 }
+                                                (AST.TType
+                                                    { name =
+                                                        SourcePosition.at
+                                                            { row = 2, col = 15 }
+                                                            { row = 2, col = 18 }
+                                                            "Bar"
+                                                    , args =
+                                                        [ SourcePosition.at
+                                                            { row = 2, col = 19 }
+                                                            { row = 2, col = 24 }
+                                                            (AST.TType
+                                                                { name =
+                                                                    SourcePosition.at
+                                                                        { row = 2, col = 19 }
+                                                                        { row = 2, col = 24 }
+                                                                        "Float"
+                                                                , args = []
+                                                                }
+                                                            )
+                                                        ]
+                                                    }
+                                                )
+                                    }
+                                ]
+                            }
+                        )
             , test "Should fail if it doesn't start at col 1" <| \_ ->
                 Parser.run PD.parser Context.empty
                     """

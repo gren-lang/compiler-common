@@ -1,6 +1,7 @@
 module Compiler.Parse.Type exposing
     ( Error (..)
     , expression
+    , term
     , errorToString
     )
 
