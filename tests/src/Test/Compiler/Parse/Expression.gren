@@ -1407,6 +1407,50 @@ tests =
                                     ]
                                 }
                             )
+                , test "with alias" <| \_ ->
+                    Parser.run PE.parser Context.empty "when myVar is A as bar -> bar"
+                        |> expectExpression
+                            (AST.When
+                                { expression =
+                                    SourcePosition.at
+                                        { row = 1, col = 6 }
+                                        { row = 1, col = 11 }
+                                        (AST.Var { name = "myVar", varType = AST.LowVar })
+                                , branches =
+                                    [ { pattern =
+                                          SourcePosition.at
+                                              { row = 1, col = 15 }
+                                              { row = 1, col = 23 }
+                                              (AST.PAlias
+                                                  { name =
+                                                      SourcePosition.at
+                                                          { row = 1, col = 20 }
+                                                          { row = 1, col = 23 }
+                                                          "bar"
+                                                  , pattern =
+                                                      SourcePosition.at
+                                                          { row = 1, col = 15 }
+                                                          { row = 1, col = 16 }
+                                                          (AST.PCtor
+                                                              { name =
+                                                                  SourcePosition.at
+                                                                      { row = 1, col = 15 }
+                                                                      { row = 1, col = 16 }
+                                                                      "A"
+                                                              , arg = Nothing
+                                                              }
+                                                          )
+                                                  }
+                                              )
+                                      , body =
+                                          SourcePosition.at
+                                              { row = 1, col = 27 }
+                                              { row = 1, col = 30 }
+                                              (AST.Var { name = "bar", varType = AST.LowVar })
+                                      }
+                                    ]
+                                }
+                            )
                 , test "multiple branches" <| \_ ->
                     Parser.run PE.parser Context.empty
                         """

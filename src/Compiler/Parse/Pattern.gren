@@ -3,13 +3,14 @@ module Compiler.Parse.Pattern exposing
     , parser
     , parserNoAlias
     , topLevelParser
+    , aliasTopLevelParser
     , errorToString
     )
 
 
 {-| This module provides parsers for Gren patterns.
 
-@docs parser, topLevelParser, Error, errorToString
+@docs parser, parserNoAlias, topLevelParser, aliasTopLevelParser, Error, errorToString
 -}
 
 
@@ -86,7 +87,7 @@ parser =
         |> Parser.keep
             (Parser.oneOf
                 [ Parser.succeed Just
-                    |> Parser.skip (Parser.token "as" (ExpectedKeyword "as"))
+                    |> Parser.skip (Parser.keyword "as" (ExpectedKeyword "as"))
                     |> Parser.skip spaceParser
                     |> Parser.keep (SourcePosition.parser lowerCaseVariable)
                 , Parser.succeed Nothing
@@ -239,6 +240,37 @@ topLevelParser =
         , Parser.lazy (\_ -> parser)
         ]
     )
+
+
+{-| Use this when you want a topLevelParser that accepts aliases with the `as` keyword.
+
+    String.Parser.run parser Compiler.Parse.Context.empty source
+-}
+aliasTopLevelParser : Parser Context Error AST.Pattern
+aliasTopLevelParser =
+    Parser.succeed
+        (\pattern alias ->
+            when alias is
+                Just name ->
+                    SourcePosition.at
+                        pattern.start
+                        name.end
+                        (AST.PAlias { pattern = pattern, name = name })
+
+                Nothing ->
+                    pattern
+        )
+        |> Parser.keep topLevelParser
+        |> Parser.skip spaceParser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed Just
+                    |> Parser.skip (Parser.keyword "as" (ExpectedKeyword "as"))
+                    |> Parser.skip spaceParser
+                    |> Parser.keep (SourcePosition.parser lowerCaseVariable)
+                , Parser.succeed Nothing
+                ]
+            )
 
 
 term : Parser Context Error AST.Pattern
