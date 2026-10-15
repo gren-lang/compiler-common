@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Top-level declarations now has to start at column 1
 - More accurate calculation of large hex digits
 - Parser now correctly parses expressions like `{ r | a = 1 }.a`
+- Fixed a bug where the parser would consider multiple arguments to a custom type variant, to be args to the first argument
+- Fixed a bug where if the non-first argument to a function started with `as`, it would fail to compile
 
 ## [3.0.0] - 2026-06-22
 

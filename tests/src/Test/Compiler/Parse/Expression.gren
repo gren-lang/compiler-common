@@ -1352,6 +1352,27 @@ tests =
                                         (AST.Var { name = "a", varType = AST.LowVar })
                                 }
                             )
+                , test "test that a var starting with as isn't causing trouble" <| \_ ->
+                    Parser.run PE.parser Context.empty "\\a as_ -> a"
+                        |> expectExpression
+                            (AST.Lambda
+                                { patterns =
+                                    [ SourcePosition.at
+                                        { row = 1, col = 2 }
+                                        { row = 1, col = 3 }
+                                        (AST.PVar "a")
+                                    , SourcePosition.at
+                                        { row = 1, col = 4 }
+                                        { row = 1, col = 7 }
+                                        (AST.PVar "as_")
+                                    ]
+                                , body =
+                                    SourcePosition.at
+                                        { row = 1, col = 11 }
+                                        { row = 1, col = 12 }
+                                        (AST.Var { name = "a", varType = AST.LowVar })
+                                }
+                            )
                 ]
             , describe "when-is"
                 [ test "simple test" <| \_ ->

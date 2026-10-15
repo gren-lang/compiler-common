@@ -543,7 +543,7 @@ function =
     Parser.succeed identity
         |> Parser.skip (Parser.chompChar '\\' (ExpectedChar '\\'))
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.mapError PatternError Pattern.parser)
+        |> Parser.keep (Parser.mapError PatternError Pattern.parserNoAlias)
         |> Parser.skip spaceParser
         |> Parser.andThen
             (\firstArg ->
@@ -567,7 +567,7 @@ functionArgsParser terminator array =
         [ Parser.succeed (Parser.Done array)
             |> Parser.skip (Parser.token terminator (ExpectedKeyword terminator))
         , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
-            |> Parser.keep (Parser.mapError PatternError Pattern.parser)
+            |> Parser.keep (Parser.mapError PatternError Pattern.parserNoAlias)
             |> Parser.skip spaceParser
         ]
 
