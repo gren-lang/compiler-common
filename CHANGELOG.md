@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## next
+
+### Fixed
+
+- Accept the same upper- and lowercase variable names that the haskell based parser does
+- Top-level declarations now has to start at column 1
+- More accurate calculation of large hex digits
+- Parser now correctly parses expressions like `{ r | a = 1 }.a`
+- Fixed a bug where the parser would consider multiple arguments to a custom type variant, to be args to the first argument
+- Fixed a bug where if the non-first argument to a function started with `as`, it would fail to compile
+- Fixed a bug where `as` in when branch guards wasn't recognized unless the entire pattern was wrapped in parenthesis
+
 ## [3.0.0] - 2026-06-22
 
 ### Added

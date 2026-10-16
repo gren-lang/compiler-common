@@ -42,6 +42,18 @@ tests =
                 Parser.run setIndentParser Context.empty "    b"
                     |> Result.map .indent
                     |> Expect.equal (Ok 5)
+            , test "setIndentToCurrentColumn" <| \_ ->
+                let
+                    setIndentParser =
+                        Parser.succeed identity
+                            |> Parser.skip PS.parser
+                            |> Parser.skip (Parser.token "b" PS.InvalidWhiteSpace)
+                            |> Parser.skip PS.parser
+                            |> Parser.keep (PS.scopeIndentToCurrentColumn Parser.getPayload)
+                in
+                Parser.run setIndentParser Context.empty "    b a"
+                    |> Result.map .indent
+                    |> Expect.equal (Ok 7)
             ]
     , describe "comments" <|
         [ test "parses line comments" <| \_ ->
@@ -91,6 +103,43 @@ tests =
                     { Context.empty | indent = 2 }
             in
             Parser.run indentParser context "  x"
+                |> Expect.equal (Ok {})
+        , test "fails when column is less than indent" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 4 }
+            in
+            Parser.run indentParser context "  x"
+                |> expectProblem
+        , test "fails when column is 1" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 1 }
+            in
+            Parser.run indentParser context "x"
+                |> expectProblem
+        ]
+    , describe "checkIndentAtLeastEqual" <|
+        let
+            indentParser =
+                Parser.succeed {}
+                    |> Parser.skip PS.parser
+                    |> Parser.mapError (\_ -> {})
+                    |> Parser.andThen (\_ -> PS.checkIndentAtLeastEqual)
+        in    
+        [ test "succeeds when column is greater than indent" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 2 }
+            in
+            Parser.run indentParser context "  x"
+                |> Expect.equal (Ok {})
+        , test "succeeds when column is equal to indent" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 2 }
+            in
+            Parser.run indentParser context " x"
                 |> Expect.equal (Ok {})
         , test "fails when column is less than indent" <| \_ ->
             let

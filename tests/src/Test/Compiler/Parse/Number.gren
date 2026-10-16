@@ -81,6 +81,9 @@ tests =
             [ test "Can parse hex" <| \{} ->
                 run "0xAFFE"
                     |> Expect.equal (Ok (PN.Hex 45054))
+            , test "Can parse large hex values" <| \{} ->
+                run "0x1FFFFFFFFFFFEA"
+                    |> Expect.equal (Ok (PN.Hex 9007199254740970))
             , test "Requires a hex digit after 0x" <| \{} ->
                 run "0x"
                     |> expectErr PN.ExpectedHex

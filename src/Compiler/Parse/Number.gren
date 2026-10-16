@@ -207,15 +207,15 @@ hexFolder char acc =
     in
     if charCode >= 48 && charCode <= 57 then
         -- 0-9
-        16 * acc + charCode - 48
+        16 * acc + (charCode - 48)
 
     else if charCode >= 65 && charCode <= 70 then
         -- A-F
-        16 * acc + 10 + charCode - 65
+        16 * acc + (10 + (charCode - 65))
 
     else if charCode >= 97 && charCode <= 102 then
         -- a-f
-        16 * acc + 10 + charCode - 97
+        16 * acc + (10 + (charCode - 97))
 
     else
         acc
