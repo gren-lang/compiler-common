@@ -13,6 +13,7 @@ module Compiler.Parse.Module exposing
 
 
 import String.Parser.Advanced as Parser exposing (Parser)
+import Array.Builder as Builder exposing (Builder)
 import Compiler.Ast.Source as AST
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Space as Space
@@ -142,11 +143,11 @@ parser =
         |> Parser.skip spaceParser
         |> Parser.keep (Declaration.docParser ExpectedKeyword)
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.loop [] importLoopParser)
+        |> Parser.keep (Parser.loop (Builder.empty 0) importLoopParser)
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.loop [] operatorLoopParser)
+        |> Parser.keep (Parser.loop (Builder.empty 0) operatorLoopParser)
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.loop [] declarationLoopParser)
+        |> Parser.keep (Parser.loop (Builder.empty 0) declarationLoopParser)
 
 
 moduleNameParser : Parser Context Error (SourcePosition.Located String)
@@ -247,19 +248,20 @@ parseExposingStatement =
                             |> Parser.skip spaceParser
                             |> Parser.andThen
                                 (\firstExposing ->
-                                    Parser.loop [ firstExposing ] parseExposingArray
+                                    Parser.loop (Builder.pushLast firstExposing (Builder.empty 1)) parseExposingArray
                                 )
                         )
                 ]
             )
 
     
-parseExposingArray : Array AST.Exposed -> Parser Context Error (Parser.Step (Array AST.Exposed) (Array AST.Exposed))
+parseExposingArray : Builder AST.Exposed -> Parser Context Error (Parser.Step (Builder AST.Exposed) (Array AST.Exposed))
 parseExposingArray exps =
     Parser.oneOf
-        [ Parser.succeed (Parser.Done exps)
+        [ Parser.succeed exps
             |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
-        , Parser.succeed (\next -> Parser.Loop <| Array.pushLast next exps)
+            |> Parser.map (\e -> Parser.Done <| Builder.toArray e)
+        , Parser.succeed (\next -> Parser.Loop <| Builder.pushLast next exps)
             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
             |> Parser.skip spaceParser
             |> Parser.keep parseExposingValue
@@ -356,8 +358,8 @@ parseOperatorDeclaration =
 
 
 importLoopParser
-    : Array (SourcePosition.Located AST.Import)
-    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located  AST.Import)) (Array (SourcePosition.Located  AST.Import)))
+    : Builder (SourcePosition.Located AST.Import)
+    -> Parser Context Error (Parser.Step (Builder (SourcePosition.Located AST.Import)) (Array (SourcePosition.Located  AST.Import)))
 importLoopParser imps =
     Parser.oneOf
         [ Parser.succeed
@@ -424,42 +426,45 @@ importLoopParser imps =
             |> Parser.map
                 (\finalImport ->
                     Parser.Loop <|
-                        Array.pushLast finalImport imps
+                        Builder.pushLast finalImport imps
                 )
-        , Parser.succeed (Parser.Done imps)
+        , Parser.succeed imps
+            |> Parser.map (\i -> Parser.Done <| Builder.toArray i)
         ]
 
 
 operatorLoopParser
-    : Array (SourcePosition.Located AST.Infix)
-    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located AST.Infix)) (Array (SourcePosition.Located AST.Infix)))
+    : Builder (SourcePosition.Located AST.Infix)
+    -> Parser Context Error (Parser.Step (Builder (SourcePosition.Located AST.Infix)) (Array (SourcePosition.Located AST.Infix)))
 operatorLoopParser ops =
     Parser.oneOf
         [ Parser.succeed
             (\op ->
                 Parser.Loop <|
-                    Array.pushLast op ops
+                    Builder.pushLast op ops
             )
             |> Parser.keep parseOperatorDeclaration
             |> Parser.skip spaceParser
-        , Parser.succeed (Parser.Done ops)
+        , Parser.succeed ops
+            |> Parser.map (\o -> Parser.Done <| Builder.toArray o)
         ]
 
 
 declarationLoopParser
-    : Array Declaration.Declaration
-    -> Parser Context Error (Parser.Step (Array Declaration.Declaration) (Array Declaration.Declaration))
+    : Builder Declaration.Declaration
+    -> Parser Context Error (Parser.Step (Builder Declaration.Declaration) (Array Declaration.Declaration))
 declarationLoopParser decls =
     Parser.oneOf
         [ Parser.succeed
             (\decl ->
                 Parser.Loop <|
-                    Array.pushLast decl decls
+                    Builder.pushLast decl decls
             )
             |> Parser.keep (Parser.mapError DeclarationError Declaration.parser)
             |> Parser.skip spaceParser
-        , Parser.succeed (Parser.Done decls)
+        , Parser.succeed decls
             |> Parser.skip (Parser.end ExpectedEnd)
+            |> Parser.map (\d -> Parser.Done <| Builder.toArray d)
         ]
 
 

@@ -15,6 +15,7 @@ module Compiler.Parse.Declaration exposing
 
 
 import String.Parser.Advanced as Parser exposing (Parser)
+import Array.Builder as Builder exposing (Builder)
 import Compiler.Ast.Source as AST
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Space as Space
@@ -201,18 +202,19 @@ aliasParser =
         |> Parser.skip spaceParser
         |> Parser.keep (SourcePosition.parser upperCaseVariable)
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.loop [] typeArgLoopParser)
+        |> Parser.keep (Parser.loop (Builder.empty 0) typeArgLoopParser)
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.mapError TypeError Type.expression)
 
 
-typeArgLoopParser : Array (SourcePosition.Located String) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located String)) (Array (SourcePosition.Located String)))
+typeArgLoopParser : Builder (SourcePosition.Located String) -> Parser Context Error (Parser.Step (Builder (SourcePosition.Located String)) (Array (SourcePosition.Located String)))
 typeArgLoopParser vars =
     Parser.oneOf
-        [ Parser.succeed (Parser.Done vars)
+        [ Parser.succeed vars
             |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
+            |> Parser.map (\v -> Parser.Done <| Builder.toArray v)
         , Parser.succeed
-            (\var -> Parser.Loop <| Array.pushLast var vars)
+            (\var -> Parser.Loop <| Builder.pushLast var vars)
             |> Parser.keep (SourcePosition.parser lowerCaseVariable)
             |> Parser.skip spaceParser
         ]
@@ -230,13 +232,13 @@ unionParser =
         )
         |> Parser.keep (SourcePosition.parser upperCaseVariable)
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.loop [] typeArgLoopParser)
+        |> Parser.keep (Parser.loop (Builder.empty 0) typeArgLoopParser)
         |> Parser.skip spaceParser
         |> Parser.keep
             (variantParser
                 |> Parser.andThen
                     (\firstVariant ->
-                        (Parser.loop [ firstVariant ] variantLoopParser)
+                        (Parser.loop (Builder.pushLast firstVariant (Builder.empty 1)) variantLoopParser)
                     )
             )
 
@@ -276,15 +278,16 @@ variantParser =
             )
 
 
-variantLoopParser : Array (SourcePosition.Located AST.UnionVariant) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located AST.UnionVariant)) (Array (SourcePosition.Located AST.UnionVariant)))
+variantLoopParser : Builder (SourcePosition.Located AST.UnionVariant) -> Parser Context Error (Parser.Step (Builder (SourcePosition.Located AST.UnionVariant)) (Array (SourcePosition.Located AST.UnionVariant)))
 variantLoopParser variants =
     Parser.oneOf
         [ Parser.succeed
-            (\variant -> Parser.Loop <| Array.pushLast variant variants)
+            (\variant -> Parser.Loop <| Builder.pushLast variant variants)
             |> Parser.skip (Parser.chompChar '|' (ExpectedChar '|'))
             |> Parser.skip spaceParser
             |> Parser.keep variantParser
-        , Parser.succeed (Parser.Done variants)
+        , Parser.succeed variants
+            |> Parser.map (\v -> Parser.Done <| Builder.toArray v)
         ]
 
 

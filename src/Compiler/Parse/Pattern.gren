@@ -15,6 +15,7 @@ module Compiler.Parse.Pattern exposing
 
 
 import String.Parser.Advanced as Parser exposing (Parser)
+import Array.Builder as Builder exposing (Builder)
 import Compiler.Ast.Source as AST
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Parse.Number as Number
@@ -111,15 +112,16 @@ record =
         |> Parser.keep Parser.getPosition
         |> Parser.skip (Parser.chompChar '{' (ExpectedChar '{'))
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.loop [] recordInnerLoop)
+        |> Parser.keep (Parser.loop (Builder.empty 0) recordInnerLoop)
         |> Parser.keep Parser.getPosition
 
 
-recordInnerLoop : Array AST.PRecordField -> Parser Context Error (Parser.Step (Array AST.PRecordField) (Array AST.PRecordField))
+recordInnerLoop : Builder AST.PRecordField -> Parser Context Error (Parser.Step (Builder AST.PRecordField) (Array AST.PRecordField))
 recordInnerLoop acc =
     Parser.oneOf
-        [ Parser.succeed (Parser.Done acc)
+        [ Parser.succeed acc
             |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
+            |> Parser.map (\a -> Parser.Done <| Builder.toArray a)
         , Parser.succeed (\start fieldName end -> SourcePosition.at start end fieldName)
             |> Parser.keep Parser.getPosition
             |> Parser.keep lowerCaseVariable
@@ -128,9 +130,9 @@ recordInnerLoop acc =
             |> Parser.andThen
                 (\field ->
                     Parser.oneOf
-                        [ Parser.succeed (Parser.Done <| Array.pushLast { field = field, pattern = Nothing } acc)
+                        [ Parser.succeed (Parser.Done <| Builder.toArray <| Builder.pushLast { field = field, pattern = Nothing } acc)
                             |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
-                        , Parser.succeed (Parser.Loop <| Array.pushLast { field = field, pattern = Nothing } acc)
+                        , Parser.succeed (Parser.Loop <| Builder.pushLast { field = field, pattern = Nothing } acc)
                             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
                             |> Parser.skip spaceParser
                         , Parser.succeed identity
@@ -141,10 +143,10 @@ recordInnerLoop acc =
                             |> Parser.andThen
                                 (\pattern ->
                                     Parser.oneOf
-                                        [ Parser.succeed (Parser.Loop <| Array.pushLast { field = field, pattern = Just pattern } acc)
+                                        [ Parser.succeed (Parser.Loop <| Builder.pushLast { field = field, pattern = Just pattern } acc)
                                             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
                                             |> Parser.skip spaceParser
-                                        , Parser.succeed (Parser.Done <| Array.pushLast { field = field, pattern = Just pattern } acc)
+                                        , Parser.succeed (Parser.Done <| Builder.toArray <| Builder.pushLast { field = field, pattern = Just pattern } acc)
                                             |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
                                         ]
                                 )
@@ -163,7 +165,7 @@ array =
             ( Parser.oneOf
                 [ Parser.lazy (\_ -> topLevelParser)
                     |> Parser.skip spaceParser
-                    |> Parser.andThen (\firstArg -> Parser.loop [ firstArg ] arrayInnerLoop)
+                    |> Parser.andThen (\firstArg -> Parser.loop (Builder.pushLast firstArg (Builder.empty 1) ) arrayInnerLoop)
                 , Parser.succeed []
                     |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
                 ]
@@ -171,12 +173,13 @@ array =
         |> Parser.keep Parser.getPosition
 
 
-arrayInnerLoop : Array AST.Pattern -> Parser Context Error (Parser.Step (Array AST.Pattern) (Array AST.Pattern))
+arrayInnerLoop : Builder AST.Pattern -> Parser Context Error (Parser.Step (Builder AST.Pattern) (Array AST.Pattern))
 arrayInnerLoop acc =
     Parser.oneOf
-        [ Parser.succeed (Parser.Done acc)
+        [ Parser.succeed acc
             |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
-        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr acc))
+            |> Parser.map (\a -> Parser.Done <| Builder.toArray a)
+        , Parser.succeed (\expr -> Parser.Loop (Builder.pushLast expr acc))
             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
             |> Parser.skip spaceParser
             |> Parser.keep topLevelParser

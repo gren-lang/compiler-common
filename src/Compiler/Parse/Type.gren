@@ -13,6 +13,7 @@ module Compiler.Parse.Type exposing
 
 
 import Compiler.Parse.Context exposing (Context)
+import Array.Builder as Builder exposing (Builder)
 import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.SourcePosition as SourcePosition
 import Compiler.Ast.Source as AST
@@ -122,17 +123,18 @@ app =
         |> Parser.keep (Parser.mapError VariableError Variable.foreignUpper)
         |> Parser.keep Parser.getPosition
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.loop [] typeArgsParser)
+        |> Parser.keep (Parser.loop (Builder.empty 0) typeArgsParser)
 
 
-typeArgsParser : Array AST.Type -> Parser Context Error (Parser.Step (Array AST.Type) (Array AST.Type))
+typeArgsParser : Builder AST.Type -> Parser Context Error (Parser.Step (Builder AST.Type) (Array AST.Type))
 typeArgsParser array =
     Parser.oneOf
-        [ Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+        [ Parser.succeed (\expr -> Parser.Loop (Builder.pushLast expr array))
             |> Parser.skip (Parser.mapError (\_ -> ExpectedIndent) Space.checkIndent)
             |> Parser.keep expression
             |> Parser.skip spaceParser
-        , Parser.succeed (Parser.Done array)
+        , Parser.succeed array
+            |> Parser.map (\a -> Parser.Done <| Builder.toArray a)
         ]
 
 
@@ -206,7 +208,7 @@ recordParser =
                                     |> Parser.skip spaceParser
                                     |> Parser.andThen
                                         (\firstPair ->
-                                            Parser.loop [ firstPair ] innerRecordParser
+                                            Parser.loop (Builder.pushLast firstPair (Builder.empty 1)) innerRecordParser
                                         )
                                     |> Parser.map (\fields -> AST.TRecord { fields = fields, extending = Just var })
                                 , Parser.succeed identity
@@ -216,7 +218,7 @@ recordParser =
                                     |> Parser.skip spaceParser
                                     |> Parser.andThen
                                         (\expr ->
-                                            Parser.loop [ { field = var, signature = expr } ] innerRecordParser
+                                            Parser.loop (Builder.pushLast { field = var, signature = expr } (Builder.empty 1)) innerRecordParser
                                         )
                                     |> Parser.map (\fields -> AST.TRecord { fields = fields, extending = Nothing })
                                 ]
@@ -242,12 +244,13 @@ recordFieldParser =
         |> Parser.keep expression
 
 
-innerRecordParser : Array AST.TRecordField -> Parser Context Error (Parser.Step (Array AST.TRecordField) (Array AST.TRecordField))
+innerRecordParser : Builder AST.TRecordField -> Parser Context Error (Parser.Step (Builder AST.TRecordField) (Array AST.TRecordField))
 innerRecordParser array =
     Parser.oneOf
-        [ Parser.succeed (Parser.Done array)
+        [ Parser.succeed array
             |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
-        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.map (\a -> Parser.Done <| Builder.toArray a)
+        , Parser.succeed (\expr -> Parser.Loop (Builder.pushLast expr array))
             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
             |> Parser.skip spaceParser
             |> Parser.keep recordFieldParser
