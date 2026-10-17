@@ -8,7 +8,7 @@ module Compiler.Parse.Type exposing
 
 {-| This module provides parsers for Gren type expressions.
 
-@docs expression, Error, errorToString
+@docs expression, term, Error, errorToString
 -}
 
 
@@ -138,6 +138,9 @@ typeArgsParser array =
         ]
 
 
+{-| Parses a single term. Notably, in the context of aliases and custom types,
+this parser doesn't look for the parameters following the type name.
+-}
 term : Parser Context Error AST.Type
 term =
     Parser.getPosition

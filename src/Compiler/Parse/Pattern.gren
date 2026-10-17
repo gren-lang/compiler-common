@@ -96,6 +96,8 @@ parser =
             )
 
 
+{-| Same as `parser`, but doesn't look for the `as` keyword following the pattern
+-}
 parserNoAlias : Parser Context Error AST.Pattern
 parserNoAlias =
     Parser.oneOf
