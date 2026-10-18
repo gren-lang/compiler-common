@@ -363,15 +363,16 @@ importLoopParser
 importLoopParser imps =
     Parser.oneOf
         [ Parser.succeed
-            (\moduleName ->
+            (\startPos moduleName ->
                 SourcePosition.at
-                    { moduleName.start | col = 1 }
+                    startPos
                     moduleName.end
                     { module_ = moduleName
                     , alias = Nothing
                     , expose = AST.Explicit []
                     }
             )
+            |> Parser.keep Parser.getPosition
             |> Parser.skip (Parser.token "import" (ExpectedKeyword "import"))
             |> Parser.skip spaceParser
             |> Parser.keep moduleNameParser
@@ -470,21 +471,12 @@ declarationLoopParser decls =
 
 declarationToModuleValue : Declaration -> Maybe (AST.ModuleDeclaration AST.Value)
 declarationToModuleValue decl =
-    when decl.value is
+    when decl.value.value is
         Declaration.Value v ->
-            let
-                start =
-                    when v.signature is
-                        Nothing ->
-                            v.name.start
-
-                        Just ts ->
-                            ts.start
-            in
             Just <|
                 SourcePosition.at
-                    start
-                    v.body.end
+                    decl.value.start
+                    decl.value.end
                     { docs = decl.docs
                     , value = v
                     }
@@ -495,12 +487,12 @@ declarationToModuleValue decl =
 
 declarationToModuleAlias : Declaration -> Maybe (AST.ModuleDeclaration AST.Alias)
 declarationToModuleAlias decl =
-    when decl.value is
+    when decl.value.value is
         Declaration.Alias v ->
             Just <|
                 SourcePosition.at
-                    { row = v.name.start.row, col = 1 }
-                    v.type_.end
+                    decl.value.start
+                    decl.value.end
                     { docs = decl.docs
                     , value = v
                     }
@@ -511,18 +503,12 @@ declarationToModuleAlias decl =
 
 declarationToModuleUnion : Declaration -> Maybe (AST.ModuleDeclaration AST.Union)
 declarationToModuleUnion decl =
-    when decl.value is
+    when decl.value.value is
         Declaration.Union v ->
-            let
-                endPos =
-                    Array.last v.variants
-                        |> Maybe.map .end
-                        |> Maybe.withDefault v.name.end
-            in
             Just <|
                 SourcePosition.at
-                    { row = v.name.start.row, col = 1 }
-                    endPos
+                    decl.value.start
+                    decl.value.end
                     { docs = decl.docs
                     , value = v
                     }
@@ -533,12 +519,12 @@ declarationToModuleUnion decl =
 
 declarationToModulePort : Declaration -> Maybe (AST.ModuleDeclaration AST.Port)
 declarationToModulePort decl =
-    when decl.value is
+    when decl.value.value is
         Declaration.Port v ->
             Just <|
                 SourcePosition.at
-                    { row = v.name.start.row, col = 1 }
-                    v.signature.end
+                    decl.value.start
+                    decl.value.end
                     { docs = decl.docs
                     , value = v
                     }

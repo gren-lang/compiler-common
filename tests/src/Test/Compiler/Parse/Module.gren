@@ -1016,6 +1016,143 @@ tests =
                     , binops = []
                     , effects = AST.NoEffects
                     }
+        , test "Positions of types and ports" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module PosBug exposing (..)
+
+                import
+                    Array
+
+                type
+                    alias Foo =
+                    { x : Int }
+
+                port
+                    baz : Int -> Cmd msg
+                """
+                |> expect
+                    { aliases =
+                        [ { end = { col = 16, row = 8 }
+                          , start = { col = 1, row = 6 }
+                          , value =
+                              { docs = Nothing
+                              , value =
+                                { name =
+                                    { end = { col = 14, row = 7 }
+                                    , start = { col = 11, row = 7 }
+                                    , value = "Foo"
+                                    }
+                                , type_ =
+                                    { end = { col = 16, row = 8 }
+                                    , start = { col = 5, row = 8 }
+                                    , value =
+                                        AST.TRecord
+                                            { extending = Nothing
+                                            , fields =
+                                                [ { field =
+                                                      { end = { col = 8, row = 8 }
+                                                      , start = { col = 7, row = 8 }
+                                                      , value = "x"
+                                                      }
+                                                , signature =
+                                                    { end = { col = 14, row = 8 }
+                                                    , start = { col = 11, row = 8 }
+                                                    , value =
+                                                        AST.TType
+                                                            { args = []
+                                                            , name =
+                                                                { end = { col = 14, row = 8 }
+                                                                , start = { col = 11, row = 8 }
+                                                                , value = "Int"
+                                                                }
+                                                            }
+                                                    }
+                                                  }
+                                                ]
+                                            }
+                                    }
+                                , vars = []
+                                }
+                              }
+                          }
+                        ]
+                    , binops = []
+                    , docs = Nothing
+                    , effects =
+                        AST.Ports
+                            [ { end = { col = 25, row = 11 }
+                              , start = { col = 1, row = 10 }
+                              , value =
+                                  { docs = Nothing
+                                  , value =
+                                      { name =
+                                          { end = { col = 8, row = 11 }
+                                          , start = { col = 5, row = 11 }
+                                          , value = "baz"
+                                          }
+                                      , signature =
+                                          { end = { col = 25, row = 11 }
+                                          , start = { col = 11, row = 11 }
+                                          , value =
+                                              AST.TLambda
+                                                  { from =
+                                                      { end = { col = 14, row = 11 }
+                                                      , start = { col = 11, row = 11 }
+                                                      , value =
+                                                          AST.TType
+                                                              { args = []
+                                                              , name =
+                                                                  { end = { col = 14, row = 11 }
+                                                                  , start = { col = 11, row = 11 }
+                                                                  , value = "Int"
+                                                                  }
+                                                              }
+                                                      }
+                                                  , to =
+                                                      { end = { col = 25, row = 11 }
+                                                      , start = { col = 18, row = 11 }
+                                                      , value =
+                                                          AST.TType
+                                                              { args =
+                                                                  [ { end = { col = 25, row = 11 }
+                                                                  , start = { col = 22, row = 11 }
+                                                                  , value = AST.TVar "msg"
+                                                                  } ]
+                                                              , name =
+                                                                  { end = { col = 21, row = 11 }
+                                                                  , start = { col = 18, row = 11 }
+                                                                  , value = "Cmd"
+                                                                  }
+                                                              }
+                                                      }
+                                                  }
+                                          }
+                                      }
+                                }
+                            } ]
+                    , exports = AST.Open
+                    , imports =
+                        [ { end = { col = 10, row = 4 }
+                          , start = { col = 1, row = 3 }
+                          , value =
+                              { alias = Nothing
+                              , expose = AST.Explicit []
+                              , module_ =
+                                  { end = { col = 10, row = 4 }
+                                  , start = { col = 5, row = 4 }
+                                  , value = "Array"
+                                  }
+                              }
+                        } ]
+                    , name =
+                        { end = { col = 14, row = 1 }
+                        , start = { col = 8, row = 1 }
+                        , value = "PosBug"
+                        }
+                    , unions = []
+                    , values = []
+                    }
         ]
 
 expect : AST.Module -> Result (Array (Parser.DeadEnd c e)) AST.Module -> Expectation
