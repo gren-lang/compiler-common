@@ -132,8 +132,9 @@ recordInnerLoop acc =
             |> Parser.andThen
                 (\field ->
                     Parser.oneOf
-                        [ Parser.succeed (Parser.Done <| Builder.toArray <| Builder.pushLast { field = field, pattern = Nothing } acc)
+                        [ Parser.succeed acc
                             |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
+                            |> Parser.map (\a -> Parser.Done <| Builder.toArray <| Builder.pushLast { field = field, pattern = Nothing } a)
                         , Parser.succeed (Parser.Loop <| Builder.pushLast { field = field, pattern = Nothing } acc)
                             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
                             |> Parser.skip spaceParser
@@ -148,8 +149,9 @@ recordInnerLoop acc =
                                         [ Parser.succeed (Parser.Loop <| Builder.pushLast { field = field, pattern = Just pattern } acc)
                                             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
                                             |> Parser.skip spaceParser
-                                        , Parser.succeed (Parser.Done <| Builder.toArray <| Builder.pushLast { field = field, pattern = Just pattern } acc)
+                                        , Parser.succeed acc
                                             |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
+                                            |> Parser.map (\a -> Parser.Done <| Builder.toArray <| Builder.pushLast { field = field, pattern = Just pattern } a)
                                         ]
                                 )
                         ]
