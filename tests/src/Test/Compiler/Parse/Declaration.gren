@@ -776,7 +776,7 @@ expect expected result =
             Expect.fail (Debug.toString err)
 
         Ok decl ->
-            Expect.equal expected decl.value
+            Expect.equal expected decl.value.value
 
 
 expectErr : PD.Error -> Result (Array (Parser.DeadEnd c PD.Error)) PD.Declaration -> Expectation
@@ -798,7 +798,11 @@ expectDoc expectedDocs expectedValue result =
         Ok decl ->
             Expect.equal
                 { docs = Just expectedDocs
-                , value = expectedValue
+                , value =
+                    SourcePosition.at
+                        decl.value.start
+                        decl.value.end
+                        expectedValue
                 }
                 decl
 

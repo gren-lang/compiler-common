@@ -94,6 +94,22 @@ tests =
                     (max)
                 """
             |> Snapshot.this
+        , test "positions" <| \_ ->
+            parse
+                """
+                module PosBug exposing (..)
+
+                import
+                    Array
+
+                type
+                    alias Foo =
+                    { x : Int }
+
+                port
+                    baz : Int -> Cmd msg
+                """
+                |> Snapshot.this
         , test "requires with alias and exposing" <| \_ ->
             parse
                 """
