@@ -13,13 +13,30 @@ tests =
             [ test "valid name" <| \{} ->
                 ModuleName.fromString "MyModule"
                     |> Maybe.map ModuleName.toString
-                    |> Maybe.withDefault ""
-                    |> Expect.equal "MyModule"
+                    |> Expect.equal (Just "MyModule")
+            , test "unicode" <| \_ ->
+                ModuleName.fromString "Åberg"
+                    |> Maybe.map ModuleName.toString
+                    |> Expect.equal (Just "Åberg")
+            , test "underscore" <| \_ ->
+                ModuleName.fromString "Slug_"
+                    |> Maybe.map ModuleName.toString
+                    |> Expect.equal (Just "Slug_")
+            , test "with unicode, upper case, digits and underscore" <| \_ ->
+                ModuleName.fromString "MiN_1_Øse"
+                    |> Maybe.map ModuleName.toString
+                    |> Expect.equal (Just "MiN_1_Øse")
+            , test "no emojis" <| \_ ->
+                ModuleName.fromString "Hey🫵"
+                    |> Expect.equal Nothing
+            , test "unicode Lt" <| \_ ->
+                ModuleName.fromString "ǅa"
+                    |> Maybe.map ModuleName.toString
+                    |> Expect.equal (Just "ǅa")
             , test "valid nested name" <| \{} ->
                 ModuleName.fromString "My.Nested.Module"
                     |> Maybe.map ModuleName.toString
-                    |> Maybe.withDefault ""
-                    |> Expect.equal "My.Nested.Module"
+                    |> Expect.equal (Just "My.Nested.Module")
             , test "name must be capitalized" <| \{} ->
                 ModuleName.fromString "myModule"
                     |> Expect.equal Nothing

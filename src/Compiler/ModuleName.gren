@@ -22,6 +22,7 @@ module Compiler.ModuleName exposing
 
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
+import Compiler.Parse.Variable as Var
 
 
 {-| A valid module name like `Module.Name`.
@@ -42,7 +43,7 @@ fromString str =
         sectionTest section =
             when String.popFirst section is
                 Just { first, rest } ->
-                    Char.isUpper first && String.all Char.isAlphaNum rest
+                    Var.isUpperCaseLetter first && String.all Var.isInner rest
 
                 Nothing ->
                     False
