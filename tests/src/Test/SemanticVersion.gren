@@ -61,6 +61,20 @@ tests =
 
                     Nothing ->
                         Expect.pass
+            , test "each part must be a number" <| \{} -> 
+                when SV.fromString "1.x.0" is
+                    Just version ->
+                        Expect.fail "This should have failed"
+
+                    Nothing ->
+                        Expect.pass
+            , test "just being three numbers is not enough" <| \{} -> 
+                when SV.fromString "1.x.2.3" is
+                    Just version ->
+                        Expect.fail "This should have failed"
+
+                    Nothing ->
+                        Expect.pass
             ]
         , describe "compare"
             [ test "LT" <| \{} ->
