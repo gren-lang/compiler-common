@@ -130,8 +130,8 @@ typeArgsParser : Builder AST.Type -> Parser Context Error (Parser.Step (Builder 
 typeArgsParser array =
     Parser.oneOf
         [ Parser.succeed (\expr -> Parser.Loop (Builder.pushLast expr array))
-            |> Parser.skip (Parser.mapError (\_ -> ExpectedIndent) Space.checkIndent)
-            |> Parser.keep expression
+            |> Parser.skip checkIndent
+            |> Parser.keep term
             |> Parser.skip spaceParser
         , Parser.succeed array
             |> Parser.map (\a -> Parser.Done <| Builder.toArray a)
