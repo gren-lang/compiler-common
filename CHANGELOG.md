@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Retain parens in AST when parsing custom type declarations like `type A = B (Array C)`
+- Fixed regression where function calls could interpret the next defintion in a let-, or branch in a when-expression as an argument
 
 ## [4.1.0] - 2026-10-22
 
