@@ -390,7 +390,7 @@ tests =
                             , variants =
                                 [ SourcePosition.at
                                     { row = 2, col = 7 }
-                                    { row = 2, col = 24 }
+                                    { row = 2, col = 25 }
                                     { name =
                                         SourcePosition.at
                                             { row = 2, col = 7 }
@@ -399,29 +399,34 @@ tests =
                                     , payload =
                                         Just <|
                                             SourcePosition.at
-                                                { row = 2, col = 15 }
-                                                { row = 2, col = 24 }
-                                                (AST.TType
-                                                    { name =
-                                                        SourcePosition.at
-                                                            { row = 2, col = 15 }
-                                                            { row = 2, col = 18 }
-                                                            "Bar"
-                                                    , args =
-                                                        [ SourcePosition.at
-                                                            { row = 2, col = 19 }
-                                                            { row = 2, col = 24 }
-                                                            (AST.TType
-                                                                { name =
-                                                                    SourcePosition.at
-                                                                        { row = 2, col = 19 }
-                                                                        { row = 2, col = 24 }
-                                                                        "Float"
-                                                                , args = []
-                                                                }
-                                                            )
-                                                        ]
-                                                    }
+                                                { row = 2, col = 14 }
+                                                { row = 2, col = 25 }
+                                                (AST.TParens
+                                                    (SourcePosition.at
+                                                        { row = 2, col = 15 }
+                                                        { row = 2, col = 24 }
+                                                        (AST.TType
+                                                            { name =
+                                                                SourcePosition.at
+                                                                    { row = 2, col = 15 }
+                                                                    { row = 2, col = 18 }
+                                                                    "Bar"
+                                                            , args =
+                                                                [ SourcePosition.at
+                                                                    { row = 2, col = 19 }
+                                                                    { row = 2, col = 24 }
+                                                                    (AST.TType
+                                                                        { name =
+                                                                            SourcePosition.at
+                                                                                { row = 2, col = 19 }
+                                                                                { row = 2, col = 24 }
+                                                                                "Float"
+                                                                        , args = []
+                                                                        }
+                                                                    )
+                                                                ]
+                                                            }
+                                                    )   )
                                                 )
                                     }
                                 ]
