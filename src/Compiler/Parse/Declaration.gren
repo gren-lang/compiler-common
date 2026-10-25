@@ -294,6 +294,7 @@ variantParser =
                     |> Parser.keep (Parser.mapError TypeError Type.expression)
                     |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
                     |> Parser.keep Parser.getPosition
+                    |> Parser.skip spaceParser
                 , Parser.succeed Just
                     |> Parser.skip (Parser.mapError (\_ -> IndentationError) Space.checkIndent)
                     |> Parser.keep (Parser.mapError TypeError Type.term)
