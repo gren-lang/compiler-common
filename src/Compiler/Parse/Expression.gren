@@ -402,7 +402,8 @@ letDefDestructParser =
         |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip checkIndent
+        |> Parser.keep (Space.scopeIndentToCurrentColumn (Parser.lazy (\_ -> parser)))
 
 
 letDefLoopParser : Builder (SourcePosition.Located AST.Def) -> Parser Context Error (Parser.Step (Builder (SourcePosition.Located AST.Def)) (Array (SourcePosition.Located AST.Def)))

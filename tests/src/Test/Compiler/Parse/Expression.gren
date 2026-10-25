@@ -2339,6 +2339,102 @@ tests =
                                         (AST.Var { name = "a", varType = AST.LowVar })
                                 }
                             )
+                , test "Destructuring with following definition" <| \_ ->
+                    Parser.run PE.parser Context.empty
+                        """
+                        let
+                            { a } =
+                                { a = 5 }
+
+                            b =
+                                2
+                        in
+                        a + b
+                        """
+                        |> expectExpression
+                            (AST.Let
+                                { defs =
+                                    [ SourcePosition.at
+                                        { row = 2, col = 5 }
+                                        { row = 3, col = 18 }
+                                        (AST.Destruct
+                                            { pattern =
+                                                SourcePosition.at
+                                                    { row = 2, col = 5 }
+                                                    { row = 2, col = 10 }
+                                                    (AST.PRecord
+                                                        [ { field =
+                                                              SourcePosition.at
+                                                                  { row = 2, col = 7 }
+                                                                  { row = 2, col = 8 }
+                                                                  "a"
+                                                          , pattern = Nothing
+                                                          }
+                                                        ]
+                                                    )
+                                            , body =
+                                                SourcePosition.at
+                                                    { row = 3, col = 9 }
+                                                    { row = 3, col = 18 }
+                                                    (AST.Record
+                                                        [ { field =
+                                                              SourcePosition.at
+                                                                  { row = 3, col = 11 }
+                                                                  { row = 3, col = 12 }
+                                                                  "a"
+                                                          , value =
+                                                              SourcePosition.at
+                                                                  { row = 3, col = 15 }
+                                                                  { row = 3, col = 16 }
+                                                                  (AST.NumberLiteral (Number.Integer 5))
+                                                          }
+                                                        ]
+                                                    )
+                                            }
+                                        )
+                                    , SourcePosition.at
+                                        { row = 5, col = 5 }
+                                        { row = 6, col = 10 }
+                                        (AST.Define
+                                            { name =
+                                                SourcePosition.at
+                                                    { row = 5, col = 5 }
+                                                    { row = 5, col = 6 }
+                                                    "b"
+                                            , args = []
+                                            , typeSignature = Nothing
+                                            , body =
+                                                SourcePosition.at
+                                                    { row = 6, col = 9 }
+                                                    { row = 6, col = 10 }
+                                                    (AST.NumberLiteral (Number.Integer 2))
+                                            }
+                                        )
+                                    ]
+                                , body =
+                                    SourcePosition.at
+                                        { row = 8, col = 1 }
+                                        { row = 8, col = 6 }
+                                        (AST.Binops
+                                            { left =
+                                                SourcePosition.at
+                                                    { row = 8, col = 1 }
+                                                    { row = 8, col = 2 }
+                                                    (AST.Var { name = "a", varType = AST.LowVar })
+                                            , operator =
+                                                SourcePosition.at
+                                                    { row = 8, col = 3 }
+                                                    { row = 8, col = 4 }
+                                                    "+"
+                                            , right =
+                                                SourcePosition.at
+                                                    { row = 8, col = 5 }
+                                                    { row = 8, col = 6 }
+                                                    (AST.Var { name = "b", varType = AST.LowVar })
+                                            }
+                                        )
+                                }
+                            )
                 ]
         ]
 

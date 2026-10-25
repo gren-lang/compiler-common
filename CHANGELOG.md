@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed regression where function calls could interpret the next defintion in a let-, or branch in a when-expression as an argument
 - `Maybe a -> b` was parsed as `Maybe (a -> b)`
 - Custom type variants that involved parenthesis, like `| Variant (Result a b)`, didn't consume the following whitespace, often causing parsing failure
+- Destructuring within a let-expression didn't follow the same indentation rules as regular bindings
 
 ## [4.1.0] - 2026-10-22
 
