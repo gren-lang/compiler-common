@@ -8,6 +8,10 @@ module Compiler.Parse.Variable exposing
     , foreignVar
     , reservedWords
     , errorToString
+    , isLowerCaseLetter
+    , isUpperCaseLetter
+    , isUnicodeLetter
+    , isInner
     )
 
 
@@ -18,6 +22,10 @@ module Compiler.Parse.Variable exposing
 ## Errors
 
 @docs Error, errorToString
+
+## Parser predicates
+
+@docs isLowerCaseLetter, isUpperCaseLetter, isUnicodeLetter, isInner
 -}
 
 
@@ -227,6 +235,8 @@ lowerCaseLetterRegex =
         |> Maybe.withDefault Regex.never
 
 
+{-| Tests if a `Char` is a lower case unicode letter
+-}
 isLowerCaseLetter : Char -> Bool
 isLowerCaseLetter char =
     String.fromChar char
@@ -239,6 +249,8 @@ upperCaseLetterRegex =
         |> Maybe.withDefault Regex.never
 
 
+{-| Tests if a `Char` is a upper case unicode letter
+-}
 isUpperCaseLetter : Char -> Bool
 isUpperCaseLetter char =
     String.fromChar char
@@ -251,12 +263,17 @@ unicodeLetterRegex =
         |> Maybe.withDefault Regex.never
 
 
+{-| Tests if a `Char` is a unicode letter (lower- or upper case)
+-}
 isUnicodeLetter : Char -> Bool
 isUnicodeLetter char =
     String.fromChar char
         |> Regex.contains unicodeLetterRegex
 
 
+{-| Tests if a `Char` matches the requirement to be the inner (not first)
+character of a Gren variable name
+-}
 isInner : Char -> Bool
 isInner char =
     Char.isAlphaNum char

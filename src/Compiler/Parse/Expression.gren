@@ -111,52 +111,37 @@ parser =
     parserNoArgs
         |> Parser.andThen
             (\firstTerm ->
-                let
-                    completionParser =
-                        Parser.succeed identity
-                            |> Parser.skip spaceParser
-                            |> Parser.keep
-                                (Parser.loop
-                                    { currentTerm = firstTerm
-                                    , currentArgs = Builder.empty 3
-                                    , incompleteBinop = Nothing
-                                    }
-                                    argOrOperatorLoop
-                                )
-                            |> Parser.map
-                                (\state ->
-                                    let
-                                        finalExpression =
-                                            toCall state.currentTerm (Builder.toArray state.currentArgs)
-                                    in
-                                    when state.incompleteBinop is
-                                        Just incomplete ->
-                                            SourcePosition.at
-                                                incomplete.left.start
-                                                finalExpression.end
-                                                (AST.Binops
-                                                    { left = incomplete.left
-                                                    , operator = incomplete.operator
-                                                    , right = finalExpression
-                                                    }
-                                                )
-                                        
-                                        Nothing ->
-                                            finalExpression
-                                )
-
-                    indentationBumped =
-                        Space.scopeIndentToLineStart completionParser
-                in
-                when firstTerm.value is
-                    AST.Var _ ->
-                        indentationBumped
-
-                    AST.VarQual _ ->
-                        indentationBumped
-
-                    _ ->
-                        completionParser
+                Parser.succeed identity
+                    |> Parser.skip spaceParser
+                    |> Parser.keep
+                        (Parser.loop
+                            { currentTerm = firstTerm
+                            , currentArgs = Builder.empty 3
+                            , incompleteBinop = Nothing
+                            }
+                            argOrOperatorLoop
+                        )
+                    |> Parser.map
+                        (\state ->
+                            let
+                                finalExpression =
+                                    toCall state.currentTerm (Builder.toArray state.currentArgs)
+                            in
+                            when state.incompleteBinop is
+                                Just incomplete ->
+                                    SourcePosition.at
+                                        incomplete.left.start
+                                        finalExpression.end
+                                        (AST.Binops
+                                            { left = incomplete.left
+                                            , operator = incomplete.operator
+                                            , right = finalExpression
+                                            }
+                                        )
+                            
+                                Nothing ->
+                                    finalExpression
+                        )
             )
 
 
@@ -417,7 +402,8 @@ letDefDestructParser =
         |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
         |> Parser.skip spaceParser
-        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip checkIndent
+        |> Parser.keep (Space.scopeIndentToCurrentColumn (Parser.lazy (\_ -> parser)))
 
 
 letDefLoopParser : Builder (SourcePosition.Located AST.Def) -> Parser Context Error (Parser.Step (Builder (SourcePosition.Located AST.Def)) (Array (SourcePosition.Located AST.Def)))

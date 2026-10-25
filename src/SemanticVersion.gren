@@ -71,16 +71,19 @@ fromString str =
         parts =
             str
             |> String.split "."
-            |> Array.mapAndKeepJust String.toInt
-            |> Array.keepIf (\num -> num >= 0)
+            |> Array.map String.toInt
     in
     when parts is
-        [ major, minor, patch ] ->
-            Just
-                { major = major
-                , minor = minor
-                , patch = patch
-                }
+        [ Just major, Just minor, Just patch ] ->
+            if Array.any (\n -> n < 0) [ major, minor, patch ] then
+                Nothing
+
+            else
+                Just
+                    { major = major
+                    , minor = minor
+                    , patch = patch
+                    }
 
         _ ->
             Nothing

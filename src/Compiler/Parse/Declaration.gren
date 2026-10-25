@@ -283,12 +283,18 @@ variantParser =
         |> Parser.skip spaceParser
         |> Parser.keep
             (Parser.oneOf
-                [ Parser.succeed Just
+                [ Parser.succeed
+                    (\parenStart expr parenEnd ->
+                        Just (SourcePosition.at parenStart parenEnd (AST.TParens expr))
+                    )
                     |> Parser.skip (Parser.mapError (\_ -> IndentationError) Space.checkIndent)
+                    |> Parser.keep Parser.getPosition
                     |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
                     |> Parser.skip spaceParser
                     |> Parser.keep (Parser.mapError TypeError Type.parser)
                     |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+                    |> Parser.keep Parser.getPosition
+                    |> Parser.skip spaceParser
                 , Parser.succeed Just
                     |> Parser.skip (Parser.mapError (\_ -> IndentationError) Space.checkIndent)
                     |> Parser.keep (Parser.mapError TypeError Type.term)

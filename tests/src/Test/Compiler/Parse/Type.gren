@@ -296,6 +296,47 @@ tests =
                                 )
                         }
                     )
+        , test "Lambda with parameterized types" <| \_ ->
+            Parser.run PT.parser Context.empty "Maybe a -> b -> c"
+                |> expectExpression
+                    (AST.TLambda
+                        { from =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 8 }
+                                (AST.TType
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 1 , col = 1 }
+                                            { row = 1 , col = 6 }
+                                            "Maybe"
+                                    , args =
+                                        [ SourcePosition.at
+                                            { row = 1, col = 7 }
+                                            { row = 1, col = 8 }
+                                            (AST.TVar "a")
+                                        ]
+                                    }
+                                )
+                        , to =
+                            SourcePosition.at
+                                { row = 1, col = 12 }
+                                { row = 1, col = 18 }
+                                (AST.TLambda
+                                    { from =
+                                        SourcePosition.at
+                                            { row = 1, col = 12 }
+                                            { row = 1, col = 13 }
+                                            (AST.TVar "b")
+                                    , to =
+                                        SourcePosition.at
+                                            { row = 1, col = 17 }
+                                            { row = 1, col = 18 }
+                                            (AST.TVar "c")
+                                    }
+                                )
+                        }
+                    )
         , test "Stop when variable appears on a fresh line" <| \_ ->
             Parser.run PT.parser Context.empty
                 """
