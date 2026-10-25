@@ -4,7 +4,7 @@
     "name": "gren-lang/compiler-common",
     "summary": "Common functionality of the Gren compiler",
     "license": "BSD-3-Clause",
-    "version": "4.1.0",
+    "version": "4.1.1",
     "exposed-modules": [
         "Compiler.Ast.Source",
         "Compiler.Dependencies",
