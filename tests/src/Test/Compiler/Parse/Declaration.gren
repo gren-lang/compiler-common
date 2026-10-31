@@ -760,7 +760,15 @@ tests =
                     person : Int
                      person = 1
                     """
-                    |> expectErr (PD.ExprError (Expr.VariableError Var.InvalidCharacter))
+                    |> expectErr (PD.ExprError Expr.IndentError)
+            , test "Should fail if impl doesn't start at col 1 even with comments" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| docs -}
+                    person : Int
+                    {-t-}person = 1
+                    """
+                    |> expectErr (PD.ExprError Expr.IndentError)
             ]
         , describe "Ports"
             [ test "Simple case" <| \_ ->
