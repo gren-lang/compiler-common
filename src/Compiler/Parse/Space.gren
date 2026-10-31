@@ -5,6 +5,7 @@ module Compiler.Parse.Space exposing
     , scopeIndentToCurrentColumn
     , checkIndent
     , checkIndentAtLeastEqual
+    , checkIndentExact
     , checkStartOfLine
     , errorToString
     )
@@ -16,7 +17,7 @@ module Compiler.Parse.Space exposing
 
 ## Indentation helpers
 
-@docs scopeIndentToLineStart, scopeIndentToCurrentColumn, checkIndent, checkIndentAtLeastEqual, checkStartOfLine
+@docs scopeIndentToLineStart, scopeIndentToCurrentColumn, checkIndent, checkIndentAtLeastEqual, checkIndentExact, checkStartOfLine
 -}
 
 
@@ -206,6 +207,13 @@ set indentation level
 checkIndentAtLeastEqual : Parser Context {} {}
 checkIndentAtLeastEqual =
     checkIndentHelper (\indent col -> col >= indent && col > 1)
+
+
+{-| Checks if the indent is _exactly_ the set indentation level
+-}
+checkIndentExact : Parser Context {} {}
+checkIndentExact =
+    checkIndentHelper (\indent col -> col == indent)
 
 
 {-| Check that we're at the start of a line

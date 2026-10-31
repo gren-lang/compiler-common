@@ -354,6 +354,10 @@ letDefNamedParser =
                                     (Type.expression
                                         |> Parser.mapError TypeError
                                     )
+                                |> Parser.skip
+                                    (Space.checkIndentExact
+                                        |> Parser.mapError (\_ -> IndentError)
+                                    )
                                 |> Parser.keep
                                     ( SourcePosition.parser lowerCaseVariable
                                         |> Parser.andThen

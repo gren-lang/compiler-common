@@ -156,6 +156,36 @@ tests =
             Parser.run indentParser context "x"
                 |> expectProblem
         ]
+    , describe "checkIndentExact" <|
+        let
+            indentParser =
+                Parser.succeed {}
+                    |> Parser.skip PS.parser
+                    |> Parser.mapError (\_ -> {})
+                    |> Parser.andThen (\_ -> PS.checkIndentExact)
+        in    
+        [ test "fails when column is greater than indent" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 2 }
+            in
+            Parser.run indentParser context "  x"
+                |> expectProblem
+        , test "fails when column is less than indent" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 4 }
+            in
+            Parser.run indentParser context "  x"
+                |> expectProblem
+        , test "succeeds when column is exactly the indent" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 3 }
+            in
+            Parser.run indentParser context "  x"
+                |> Expect.equal (Ok {})
+        ]
     ]
 
 
