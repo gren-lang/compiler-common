@@ -229,6 +229,100 @@ tests =
                             )
                         ]
                     )
+        , test "array with constructor and alias" <| \_ ->
+            Parser.run PT.parser Context.empty "[ Just 1 as whole ]"
+                |> expectPattern
+                    (AST.PArray
+                        [ SourcePosition.at
+                            { row = 1, col = 3 }
+                            { row = 1, col = 18 }
+                            (AST.PAlias
+                                { pattern =
+                                    SourcePosition.at
+                                        { row = 1, col = 3 }
+                                        { row = 1, col = 9 }
+                                        (AST.PCtor
+                                            { arg =
+                                                Just <|
+                                                    SourcePosition.at
+                                                        { row = 1, col = 8 }
+                                                        { row = 1, col = 9 }
+                                                        (AST.PInt { isHex = False, value = 1 })
+                                            , name =
+                                                SourcePosition.at
+                                                    { row = 1, col = 3 }
+                                                    { row = 1, col = 7 }
+                                                    "Just"
+                                            }
+                                        )
+                                , name =
+                                    SourcePosition.at
+                                        { row = 1, col = 13 }
+                                        { row = 1, col = 18 }
+                                        "whole"
+                                }
+                            )
+                        ]
+                    )
+        , test "array with two aliased constructors" <| \_ ->
+            Parser.run PT.parser Context.empty "[ Nothing as empty, Just 1 as whole ]"
+                |> expectPattern
+                    (AST.PArray
+                        [ SourcePosition.at
+                            { row = 1, col = 3 }
+                            { row = 1, col = 19 }
+                            (AST.PAlias
+                                { pattern =
+                                    SourcePosition.at
+                                        { row = 1, col = 3 }
+                                        { row = 1, col = 10 }
+                                        (AST.PCtor
+                                            { arg = Nothing
+                                            , name =
+                                                SourcePosition.at
+                                                    { row = 1, col = 3 }
+                                                    { row = 1, col = 10 }
+                                                    "Nothing"
+                                            }
+                                        )
+                                , name =
+                                    SourcePosition.at
+                                        { row = 1, col = 14 }
+                                        { row = 1, col = 19 }
+                                        "empty"
+                                }
+                            )
+                        , SourcePosition.at
+                            { row = 1, col = 21 }
+                            { row = 1, col = 36 }
+                            (AST.PAlias
+                                { pattern =
+                                    SourcePosition.at
+                                        { row = 1, col = 21 }
+                                        { row = 1, col = 27 }
+                                        (AST.PCtor
+                                            { arg =
+                                                Just <|
+                                                    SourcePosition.at
+                                                        { row = 1, col = 26 }
+                                                        { row = 1, col = 27 }
+                                                        (AST.PInt { isHex = False, value = 1 })
+                                            , name =
+                                                SourcePosition.at
+                                                    { row = 1, col = 21 }
+                                                    { row = 1, col = 25 }
+                                                    "Just"
+                                            }
+                                        )
+                                , name =
+                                    SourcePosition.at
+                                        { row = 1, col = 31 }
+                                        { row = 1, col = 36 }
+                                        "whole"
+                                }
+                            )
+                        ]
+                    )
         , test "record (empty)" <| \_ ->
             Parser.run PT.parser Context.empty "{}"
                 |> expectPattern
@@ -309,6 +403,49 @@ tests =
                                                     { row = 1, col = 20 }
                                                     { row = 1, col = 24 }
                                                     "Just"
+                                            }
+                                        )
+                           }
+                        ]
+                    )
+        , test "record with ctor and alias" <| \_ ->
+            Parser.run PT.parser Context.empty "{ b = Just 1 as whole }"
+                |> expectPattern
+                    (AST.PRecord
+                        [ { field =
+                               SourcePosition.at
+                                   { row = 1, col = 3 }
+                                   { row = 1, col = 4 }
+                                   "b"
+                           , pattern =
+                               Just <|
+                                   SourcePosition.at
+                                       { row = 1, col = 7 }
+                                       { row = 1, col = 22 }
+                                        (AST.PAlias
+                                            { pattern =
+                                                SourcePosition.at
+                                                    { row = 1, col = 7 }
+                                                    { row = 1, col = 13 }
+                                                    (AST.PCtor
+                                                        { arg =
+                                                            Just <|
+                                                                SourcePosition.at
+                                                                    { row = 1, col = 12 }
+                                                                    { row = 1, col = 13 }
+                                                                    (AST.PInt { isHex = False, value = 1 })
+                                                        , name =
+                                                            SourcePosition.at
+                                                                { row = 1, col = 7 }
+                                                                { row = 1, col = 11 }
+                                                                "Just"
+                                                        }
+                                                    )
+                                            , name =
+                                                SourcePosition.at
+                                                    { row = 1, col = 17 }
+                                                    { row = 1, col = 22 }
+                                                    "whole"
                                             }
                                         )
                            }
