@@ -48,6 +48,20 @@ tests =
                 Parser.run setIndentParser Context.empty "    b"
                     |> Result.map .indent
                     |> Expect.equal (Ok 5)
+            , test "setIndentToStartOfLine preserves startLine on same row" <| \_ ->
+                let
+                    setIndentParser =
+                        Parser.succeed identity
+                            |> Parser.skip PS.parser
+                            |> Parser.skip (Parser.chompChar 'b' PS.InvalidWhiteSpace)
+                            |> Parser.skip PS.parser
+                            |> Parser.skip (Parser.chompChar 'c' PS.InvalidWhiteSpace)
+                            |> Parser.skip PS.parser
+                            |> Parser.keep (PS.scopeIndentToLineStart Parser.getPayload)
+                in
+                Parser.run setIndentParser Context.empty "   b  c  d"
+                    |> Result.map .indent
+                    |> Expect.equal (Ok 4)
             , test "setIndentToStartOfLinePlus1" <| \_ ->
                 let
                     setIndentParser =
