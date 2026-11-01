@@ -2281,6 +2281,75 @@ tests =
                         number
                         """
                         |> expectErr PE.IndentError
+                , test "Indentation starts at first non-blank space" <| \_ ->
+                    Parser.run PE.parser Context.empty
+                        """
+                        let
+                            number =
+                                {- note -} \\x ->
+                                    max x 0
+                        in
+                        number
+                        """
+                        |> expectExpression
+                            (AST.Let
+                                { defs =
+                                    [ SourcePosition.at
+                                        { row = 2, col = 5 }
+                                        { row = 4, col = 20 }
+                                        (AST.Define
+                                            { args = []
+                                            , body =
+                                                SourcePosition.at
+                                                    { row = 3, col = 20 }
+                                                    { row = 4, col = 20 }
+                                                    (AST.Lambda
+                                                        { patterns =
+                                                            [ SourcePosition.at
+                                                                { row = 3, col = 21 }
+                                                                { row = 3, col = 22 }
+                                                                (AST.PVar "x")
+                                                            ]
+                                                        , body =
+                                                            SourcePosition.at
+                                                                { row = 4, col = 13 }
+                                                                { row = 4, col = 20 }
+                                                                (AST.Call
+                                                                    { fn =
+                                                                        SourcePosition.at
+                                                                            { row = 4, col = 13 }
+                                                                            { row = 4, col = 16 }
+                                                                            (AST.Var { name = "max", varType = AST.LowVar })
+                                                                    , args =
+                                                                        [ SourcePosition.at
+                                                                            { row = 4, col = 17 }
+                                                                            { row = 4, col = 18 }
+                                                                            (AST.Var { name = "x", varType = AST.LowVar })
+                                                                        , SourcePosition.at
+                                                                            { row = 4, col = 19 }
+                                                                            { row = 4, col = 20 }
+                                                                            (AST.NumberLiteral (Number.Integer 0))
+                                                                        ]
+                                                                    }
+                                                                )
+                                                        }
+                                                    )
+                                            , name =
+                                                SourcePosition.at
+                                                    { row = 2, col = 5 }
+                                                    { row = 2, col = 11 }
+                                                    "number"
+                                            , typeSignature = Nothing
+                                            }
+                                        )
+                                    ]
+                                , body =
+                                    SourcePosition.at
+                                        { row = 6, col = 1 }
+                                        { row = 6, col = 7 }
+                                        (AST.Var { name = "number", varType = AST.LowVar })
+                                }
+                            )
                 , test "Destructuring" <| \_ ->
                     Parser.run PE.parser Context.empty
                         """
