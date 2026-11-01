@@ -196,7 +196,7 @@ parenthesized =
     Parser.succeed identity
         |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
         |> Parser.skip spaceParser
-        |> Parser.keep topLevelParser
+        |> Parser.keep aliasTopLevelParser
         |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
 
