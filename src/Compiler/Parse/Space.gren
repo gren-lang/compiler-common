@@ -64,11 +64,20 @@ This will change `lineStart` and `comments` fields of `Context`.
 parser : Parser Context Error {}
 parser =
     Parser.getPosition
-        |> Parser.andThen (\startPos -> Parser.loop startPos parseLoop)
+        |> Parser.andThen
+            (\startPos ->
+                Parser.loop { start = startPos, candidate = startPos } parseLoop
+            )
 
 
-parseLoop : SourcePosition.Position -> Parser Context Error (Parser.Step SourcePosition.Position {})
-parseLoop pos =
+type alias LoopState =
+    { start : SourcePosition.Position
+    , candidate : SourcePosition.Position
+    }
+
+
+parseLoop : LoopState -> Parser Context Error (Parser.Step LoopState {})
+parseLoop state =
     Parser.oneOf
         [ Parser.succeed
             (\start comment end ->
@@ -82,7 +91,7 @@ parseLoop pos =
             |> Parser.keep Parser.getPosition
             |> Parser.andThen
                 (\value ->
-                    Parser.succeed (Parser.Loop <| parseLoopCalcPos pos value.start)
+                    Parser.succeed (Parser.Loop <| parseLoopCalcPos state value.start)
                         |> Parser.updatePayload (\pl -> { pl | comments = Array.Builder.pushLast value pl.comments })
                 )
         , Parser.succeed
@@ -111,32 +120,36 @@ parseLoop pos =
             |> Parser.keep Parser.getPosition
             |> Parser.andThen
                 (\value ->
-                    Parser.succeed (Parser.Loop <| parseLoopCalcPos pos value.start)
+                    Parser.succeed (Parser.Loop <| parseLoopCalcPos state value.start)
                         |> Parser.updatePayload (\pl -> { pl | comments = Array.Builder.pushLast value pl.comments })
                 )
-        , Parser.succeed (Parser.Loop pos)
+        , Parser.succeed (Parser.Loop state)
             |> Parser.skip (Parser.chompIf validWhiteSpace InvalidWhiteSpace)
             |> Parser.skip (Parser.chompWhile validWhiteSpace)
         , Parser.getPosition
             |> Parser.andThen
                 (\currentPos ->
                     let
-                        finalPos =
-                            parseLoopCalcPos pos currentPos
+                        { start, candidate } =
+                            parseLoopCalcPos state currentPos
                     in
-                    Parser.succeed (Parser.Done {})
-                        |> Parser.updatePayload (\pl -> { pl | lineStart = finalPos.col })
+                    if start.row /= candidate.row || start.col == 1 then
+                        Parser.succeed (Parser.Done {})
+                            |> Parser.updatePayload (\pl -> { pl | lineStart = candidate.col })
+
+                    else
+                        Parser.succeed (Parser.Done {})
                 )
         ]
 
 
-parseLoopCalcPos : SourcePosition.Position -> SourcePosition.Position -> SourcePosition.Position
-parseLoopCalcPos oldPos newPos =
-    if oldPos.row /= newPos.row || oldPos.col == 1 then
-        newPos
+parseLoopCalcPos : LoopState -> SourcePosition.Position -> LoopState
+parseLoopCalcPos state newPos =
+    if state.candidate.row /= newPos.row || state.candidate.col == 1 then
+        { start = state.start, candidate = newPos }
 
     else
-        oldPos
+        state
 
 
 validWhiteSpace : Char -> Bool
