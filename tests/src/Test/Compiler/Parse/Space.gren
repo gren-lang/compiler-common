@@ -32,6 +32,12 @@ tests =
             , test "can read from context where the first non-space col began (indented)" <| \_ ->
                 Parser.run payloadParser Context.empty "   a"
                     |> expectLineStart 4
+            , test "line comment counts as start of line" <| \_ ->
+                Parser.run payloadParser Context.empty " -- test"
+                    |> expectLineStart 2
+            , test "block comment counts as start of line" <| \_ ->
+                Parser.run payloadParser Context.empty "  {- test -}"
+                    |> expectLineStart 3
             , test "setIndentToStartOfLine" <| \_ ->
                 let
                     setIndentParser =
@@ -42,6 +48,16 @@ tests =
                 Parser.run setIndentParser Context.empty "    b"
                     |> Result.map .indent
                     |> Expect.equal (Ok 5)
+            , test "setIndentToStartOfLinePlus1" <| \_ ->
+                let
+                    setIndentParser =
+                        Parser.succeed identity
+                            |> Parser.skip PS.parser
+                            |> Parser.keep (PS.scopeIndentToLineStartPlus1 Parser.getPayload)
+                in
+                Parser.run setIndentParser Context.empty "    b"
+                    |> Result.map .indent
+                    |> Expect.equal (Ok 6)
             , test "setIndentToCurrentColumn" <| \_ ->
                 let
                     setIndentParser =

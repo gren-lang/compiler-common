@@ -2,6 +2,7 @@ module Compiler.Parse.Space exposing
     ( Error (..)
     , parser
     , scopeIndentToLineStart
+    , scopeIndentToLineStartPlus1
     , scopeIndentToCurrentColumn
     , checkIndent
     , checkIndentAtLeastEqual
@@ -17,7 +18,7 @@ module Compiler.Parse.Space exposing
 
 ## Indentation helpers
 
-@docs scopeIndentToLineStart, scopeIndentToCurrentColumn, checkIndent, checkIndentAtLeastEqual, checkIndentExact, checkStartOfLine
+@docs scopeIndentToLineStart, scopeIndentToLineStartPlus1, scopeIndentToCurrentColumn, checkIndent, checkIndentAtLeastEqual, checkIndentExact, checkStartOfLine
 -}
 
 
@@ -62,23 +63,12 @@ This will change `lineStart` and `comments` fields of `Context`.
 -}
 parser : Parser Context Error {}
 parser =
-    Parser.succeed (\startPos endPos -> { startPos = startPos, endPos = endPos })
-        |> Parser.keep Parser.getPosition
-        |> Parser.skip (Parser.loop {} parseLoop)
-        |> Parser.keep Parser.getPosition
-        |> Parser.andThen
-            (\{ startPos, endPos } ->
-                if startPos.row /= endPos.row || startPos.col == 1 then
-                    Parser.succeed {}
-                        |> Parser.updatePayload (\pl -> { pl | lineStart = endPos.col })
-
-                else
-                    Parser.succeed {}
-            )
+    Parser.getPosition
+        |> Parser.andThen (\startPos -> Parser.loop startPos parseLoop)
 
 
-parseLoop : {} -> Parser Context Error (Parser.Step {} {})
-parseLoop _state =
+parseLoop : SourcePosition.Position -> Parser Context Error (Parser.Step SourcePosition.Position {})
+parseLoop pos =
     Parser.oneOf
         [ Parser.succeed
             (\start comment end ->
@@ -92,15 +82,9 @@ parseLoop _state =
             |> Parser.keep Parser.getPosition
             |> Parser.andThen
                 (\value ->
-                    Parser.updatePayload
-                        (\payload  ->
-                            { payload
-                                | comments = Array.Builder.pushLast value payload.comments
-                            }
-                        )
-                        Parser.getPayload
+                    Parser.succeed (Parser.Loop <| parseLoopCalcPos pos value.start)
+                        |> Parser.updatePayload (\pl -> { pl | comments = Array.Builder.pushLast value pl.comments })
                 )
-            |> Parser.map (\_ -> Parser.Loop {})
         , Parser.succeed
             (\start comment end ->
                 comment
@@ -127,20 +111,32 @@ parseLoop _state =
             |> Parser.keep Parser.getPosition
             |> Parser.andThen
                 (\value ->
-                    Parser.updatePayload
-                        (\payload  ->
-                            { payload
-                                | comments = Array.Builder.pushLast value payload.comments
-                            }
-                        )
-                        Parser.getPayload
+                    Parser.succeed (Parser.Loop <| parseLoopCalcPos pos value.start)
+                        |> Parser.updatePayload (\pl -> { pl | comments = Array.Builder.pushLast value pl.comments })
                 )
-            |> Parser.map (\_ -> Parser.Loop {})
-        , Parser.succeed (Parser.Loop {})
+        , Parser.succeed (Parser.Loop pos)
             |> Parser.skip (Parser.chompIf validWhiteSpace InvalidWhiteSpace)
             |> Parser.skip (Parser.chompWhile validWhiteSpace)
-        , Parser.succeed (Parser.Done {})
+        , Parser.getPosition
+            |> Parser.andThen
+                (\currentPos ->
+                    let
+                        finalPos =
+                            parseLoopCalcPos pos currentPos
+                    in
+                    Parser.succeed (Parser.Done {})
+                        |> Parser.updatePayload (\pl -> { pl | lineStart = finalPos.col })
+                )
         ]
+
+
+parseLoopCalcPos : SourcePosition.Position -> SourcePosition.Position -> SourcePosition.Position
+parseLoopCalcPos oldPos newPos =
+    if oldPos.row /= newPos.row || oldPos.col == 1 then
+        newPos
+
+    else
+        oldPos
 
 
 validWhiteSpace : Char -> Bool
@@ -155,6 +151,19 @@ scopeIndentToLineStart : Parser Context e v -> Parser Context e v
 scopeIndentToLineStart p =
     Parser.scopedUpdatePayload
         .lineStart
+        .indent
+        (\newIndent payload -> { payload | indent = newIndent })
+        p
+
+
+{-| This will set `Context.indent` to be ´Context.startLine + 1` for the duration of
+the provided parser. Helpful when you want something to be indented at least one space
+on the proceeding lines.
+-}
+scopeIndentToLineStartPlus1 : Parser Context e v -> Parser Context e v
+scopeIndentToLineStartPlus1 p =
+    Parser.scopedUpdatePayload
+        (\ctx -> ctx.lineStart + 1)
         .indent
         (\newIndent payload -> { payload | indent = newIndent })
         p

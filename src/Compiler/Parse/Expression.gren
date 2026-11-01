@@ -385,8 +385,9 @@ letDefNamedParser =
                     |> Parser.keep (Parser.loop (Builder.empty 1) (functionArgsParser "="))
                     |> Parser.skip spaceParser
                     |> Parser.skip checkIndent
-                    |> Parser.keep (Space.scopeIndentToCurrentColumn (Parser.lazy (\_ -> parser)))
+                    |> Parser.keep (Parser.lazy (\_ -> parser))
             )
+            |> Space.scopeIndentToLineStartPlus1
 
 
 letDefDestructParser : Parser Context Error (SourcePosition.Located AST.Def)
@@ -407,7 +408,8 @@ letDefDestructParser =
         |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
         |> Parser.skip spaceParser
         |> Parser.skip checkIndent
-        |> Parser.keep (Space.scopeIndentToCurrentColumn (Parser.lazy (\_ -> parser)))
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Space.scopeIndentToLineStartPlus1
 
 
 letDefLoopParser : Builder (SourcePosition.Located AST.Def) -> Parser Context Error (Parser.Step (Builder (SourcePosition.Located AST.Def)) (Array (SourcePosition.Located AST.Def)))
@@ -516,8 +518,8 @@ whenBranchParser =
         |> Parser.skip (Parser.keyword "->" (ExpectedKeyword "->"))
         |> Parser.skip spaceParser
         |> Parser.skip checkIndent
-        |> Parser.keep (Space.scopeIndentToCurrentColumn (Parser.lazy (\_ -> parser)))
-        |> Space.scopeIndentToLineStart
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Space.scopeIndentToLineStartPlus1
 
 
 whenBranchLoopParser : Builder AST.WhenBranch -> Parser Context Error (Parser.Step (Builder AST.WhenBranch) (Array AST.WhenBranch))
