@@ -1507,6 +1507,95 @@ tests =
                                     ]
                                 }
                             )
+                , test "multiple branches can start on same column as 'when' keyword" <| \_ ->
+                    -- must be wrapped in a let-in due to how spaces are trimmed in multi-line strings
+                    -- and because when checking for indentation, it cannot have 1 as indentation level
+                    Parser.run PE.parser Context.empty
+                        """
+                        let
+                            chr =
+                                when myVar is
+                                A -> 'a'
+                                B -> 'b'
+                        in
+                        chr
+                        """
+                        |> expectExpression
+                            (AST.Let
+                                { body =
+                                    SourcePosition.at
+                                        { row = 7, col = 1 }
+                                        { row = 7, col = 4 }
+                                        (AST.Var { name = "chr", varType = AST.LowVar })
+                                , defs =
+                                    [ { end = { col = 17, row = 5 }
+                                      , start = { col = 5, row = 2 }
+                                      , value =
+                                            AST.Define
+                                                { args = []
+                                                , body =
+                                                    SourcePosition.at
+                                                        { row = 3, col = 9 }
+                                                        { row = 5, col = 17 }
+                                                        (AST.When
+                                                            { expression =
+                                                                SourcePosition.at
+                                                                    { row = 3, col = 14 }
+                                                                    { row = 3, col = 19 }
+                                                                    (AST.Var { name = "myVar", varType = AST.LowVar })
+                                                            , branches =
+                                                                [ { pattern =
+                                                                      SourcePosition.at
+                                                                          { row = 4, col = 9 }
+                                                                          { row = 4, col = 10 }
+                                                                          (AST.PCtor
+                                                                              { name =
+                                                                                  SourcePosition.at
+                                                                                      { row = 4, col = 9 }
+                                                                                      { row = 4, col = 10 }
+                                                                                      "A"
+                                                                              , arg = Nothing
+                                                                              }
+                                                                          )
+                                                                  , body =
+                                                                      SourcePosition.at
+                                                                          { row = 4, col = 14 }
+                                                                          { row = 4, col = 17 }
+                                                                          (AST.CharLiteral 'a')
+                                                                  }
+                                                                , { pattern =
+                                                                      SourcePosition.at
+                                                                          { row = 5, col = 9 }
+                                                                          { row = 5, col = 10 }
+                                                                          (AST.PCtor
+                                                                              { name =
+                                                                                  SourcePosition.at
+                                                                                      { row = 5, col = 9 }
+                                                                                      { row = 5, col = 10 }
+                                                                                      "B"
+                                                                              , arg = Nothing
+                                                                              }
+                                                                          )
+                                                                  , body =
+                                                                      SourcePosition.at
+                                                                          { row = 5, col = 14 }
+                                                                          { row = 5, col = 17 }
+                                                                          (AST.CharLiteral 'b')
+                                                                  }
+                                                                ]
+                                                            }
+                                                        )
+                                                , name =
+                                                    SourcePosition.at
+                                                        { row = 2, col = 5 }
+                                                        { row = 2, col = 8 }
+                                                        "chr"
+                                                , typeSignature = Nothing
+                                                }
+                                      }
+                                    ]
+                                }
+                            )
                 , test "multiple branches with function args" <| \_ ->
                     Parser.run PE.parser Context.empty
                         """
