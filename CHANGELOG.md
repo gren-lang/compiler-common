@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-11-01
+
+### Added
+
+- `Compiler.Parse.Space.checkIndentExact` verifies that the current column is exactly equal to the set indentation level
+- `Compiler.Parse.Space.scopeIndentToLineStartPlus1` sets indentation level to start of line + 1 column
+
+### Fixed
+
+- Declarations now has to be on the same column as it's type signature
+- Comments now count when calculating the start of line
+- Fixed bug where only the first branch in a when-is expression was parsed when branches were aligned with the `when` keyword
+- The `as` keyword is now parsed within parenthesis
+
 ## [4.1.1] - 2026-10-25
 
 ### Fixed
