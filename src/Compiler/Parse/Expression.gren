@@ -488,6 +488,7 @@ whenParser =
         |> Parser.skip spaceParser
         |> Parser.skip (Parser.keyword "is" (ExpectedKeyword "is"))
         |> Parser.skip spaceParser
+        |> Parser.skip checkIndentAtLeastEqual
         |> Parser.keep whenBranchParser
         |> Parser.andThen
             (\{ start, expr, firstBranch } ->
@@ -517,7 +518,7 @@ whenBranchParser =
         |> Parser.skip spaceParser
         |> Parser.skip (Parser.keyword "->" (ExpectedKeyword "->"))
         |> Parser.skip spaceParser
-        |> Parser.skip checkIndent
+        |> Parser.skip checkIndentAtLeastEqual
         |> Parser.keep (Parser.lazy (\_ -> parser))
         |> Space.scopeIndentToLineStartPlus1
 
@@ -526,7 +527,7 @@ whenBranchLoopParser : Builder AST.WhenBranch -> Parser Context Error (Parser.St
 whenBranchLoopParser branches =
     Parser.oneOf
         [ Parser.succeed (\branch -> Parser.Loop (Builder.pushLast branch branches))
-            |> Parser.skip checkIndent
+            |> Parser.skip checkIndentAtLeastEqual
             |> Parser.keep whenBranchParser
         , Parser.succeed branches
             |> Parser.map (\b -> Parser.Done <| Builder.toArray b)
