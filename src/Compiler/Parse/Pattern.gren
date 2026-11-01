@@ -141,7 +141,7 @@ recordInnerLoop acc =
                         , Parser.succeed identity
                             |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
                             |> Parser.skip spaceParser
-                            |> Parser.keep topLevelParser
+                            |> Parser.keep aliasTopLevelParser
                             |> Parser.skip spaceParser
                             |> Parser.andThen
                                 (\pattern ->
@@ -167,7 +167,7 @@ array =
         |> Parser.skip spaceParser
         |> Parser.keep
             ( Parser.oneOf
-                [ Parser.lazy (\_ -> topLevelParser)
+                [ Parser.lazy (\_ -> aliasTopLevelParser)
                     |> Parser.skip spaceParser
                     |> Parser.andThen (\firstArg -> Parser.loop (Builder.pushLast firstArg (Builder.empty 1) ) arrayInnerLoop)
                 , Parser.succeed []
@@ -186,7 +186,7 @@ arrayInnerLoop acc =
         , Parser.succeed (\expr -> Parser.Loop (Builder.pushLast expr acc))
             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
             |> Parser.skip spaceParser
-            |> Parser.keep topLevelParser
+            |> Parser.keep aliasTopLevelParser
             |> Parser.skip spaceParser
         ]
 
