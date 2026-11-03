@@ -1,6 +1,7 @@
 module Compiler.Canonicalize.Expression exposing
     ( Context
     , Error (..)
+    , errorToString
     , ScopeEntry (..)
     , OneOrMore
     , QualifiedEntry
@@ -38,6 +39,13 @@ type Error
     | AmbiguousVar { name : String, modules : Array { package : PackageName, module_ : ModuleName } }
     | NotExposed { mod : String, name : String }
     | DuplicateBinding { name : String, existingPosition : SourcePosition.Region }
+
+
+{-| TODO
+-}
+errorToString : Error -> String
+errorToString err =
+    "expr err"
 
 
 {-| Context for canonicalization:

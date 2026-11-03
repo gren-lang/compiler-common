@@ -3,6 +3,7 @@ module Compiler.Canonicalize.Module exposing
     , Context
     , emptyContext
     , Error (..)
+    , errorToString
     , canonicalize
     )
 
@@ -45,6 +46,30 @@ type Error
     | ModuleNotFound ModuleName
     | ExposedTwice (SourcePosition.Located String)
     | ExposeNotFound (SourcePosition.Located String)
+
+
+{-| Returns a human-readable description of an `Error`.
+-}
+errorToString : Error -> String
+errorToString error =
+    when error is
+        PlaceholderError ->
+            "placeholder"
+            
+        ExpressionError exprErr ->
+            Expression.errorToString exprErr
+
+        CyclicDependency modName ->
+            "Cyclic dependency: " ++ ModuleName.toString modName
+
+        ModuleNotFound modName ->
+            "Module not found: " ++ ModuleName.toString modName
+
+        ExposedTwice name ->
+            "Exposed twice: " ++ name.value
+
+        ExposeNotFound name ->
+            "Not found: " ++ name.value
 
 
 {-| Takes in a `Dict` of parsed modules, where the `String` key represents a module name, and returns
