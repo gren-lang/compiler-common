@@ -45,7 +45,42 @@ type Error
 -}
 errorToString : Error -> String
 errorToString err =
-    "expr err"
+    when err is
+        PlaceholderError ->
+            "Placeholder"
+
+        InvalidModuleName mod ->
+            "Invalid module name: " ++ mod
+
+        ModuleNotFound mod ->
+            "Module not found: " ++ mod
+
+        UnknownVar name ->
+            "Unknown var: " ++ name
+
+        UnknownOperator op ->
+            "Unknown operator: " ++ op
+
+        UnknownCtor ctor ->
+            "Unknown constructor: " ++ ctor
+
+        UnknownCtorInModule { moduleName, ctorName } ->
+            "Unknown qualified constructor: " ++ moduleName ++ "." ++ ctorName
+
+        CtorRequiresArg tipe ->
+            "Ctor requires arg"
+
+        CtorTakesNoArg ->
+            "Ctor takes no arg"
+
+        AmbiguousVar _ ->
+            "Ambigous var"
+
+        NotExposed _ ->
+            "Not exposed"
+
+        DuplicateBinding _ ->
+            "Duplicate binding"
 
 
 {-| Context for canonicalization:
