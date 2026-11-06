@@ -168,7 +168,12 @@ canonicalizeDependencies pkg parsedModules context recursionStack ast =
                                 dep.args
 
                         Nothing ->
-                            Err (ModuleNotFound dep.name)
+                            if String.startsWith "Gren.Kernel." depNameStr then
+                                -- kernel module, ignore
+                                Ok newContext
+
+                            else
+                                Err (ModuleNotFound dep.name)
                 )
                 accResult
         )
@@ -209,6 +214,7 @@ getModuleDependencies mod =
                         )
                         impl.imports
             in
+            -- TODO: skip kernel modules
             Array.append reqNames impNames
 
         ParseAst.Signature _ ->
