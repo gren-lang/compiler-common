@@ -30,7 +30,7 @@ type Error
     = PlaceholderError
     | InvalidModuleName String
     | ModuleNotFound String
-    | UnknownVar String
+    | UnknownVar (SourcePosition.Located String)
     | UnknownOperator String
     | UnknownCtor String
     | UnknownCtorInModule { moduleName : String, ctorName : String }
@@ -55,8 +55,8 @@ errorToString err =
         ModuleNotFound mod ->
             "Module not found: " ++ mod
 
-        UnknownVar name ->
-            "Unknown var: " ++ name
+        UnknownVar located ->
+            String.fromInt located.start.row ++ "| Unknown var: " ++ located.value
 
         UnknownOperator op ->
             "Unknown operator: " ++ op
@@ -138,12 +138,12 @@ type ScopeEntry
 -}
 canonicalize : Context -> ParseAst.Expression -> Result Error CanonicalAst.Expression
 canonicalize context expr =
-    canonicalize_ context expr.value
+    canonicalize_ context expr.start expr.end expr.value
         |> Result.map (SourcePosition.at expr.start expr.end)
 
 
-canonicalize_ : Context -> ParseAst.Expression_ -> Result Error CanonicalAst.Expression_
-canonicalize_ context expr =
+canonicalize_ : Context -> SourcePosition.Position -> SourcePosition.Position -> ParseAst.Expression_ -> Result Error CanonicalAst.Expression_
+canonicalize_ context start end expr =
     when expr is
         ParseAst.NumberLiteral numberOutcome ->
             when numberOutcome is
@@ -187,7 +187,7 @@ canonicalize_ context expr =
                     )
 
         ParseAst.Parens innerExpr ->
-            canonicalize_ context innerExpr.value
+            canonicalize_ context innerExpr.start innerExpr.end innerExpr.value
 
         ParseAst.VarQual { qualifier, name } ->
             if String.startsWith "Gren.Kernel." qualifier then
@@ -248,7 +248,7 @@ canonicalize_ context expr =
                         Ok (CanonicalAst.VarForeign { home = entry.module_, name = name, annotation = entry.annotation })
 
                 Nothing ->
-                    Err (UnknownVar name)
+                    Err (UnknownVar (SourcePosition.at start end name))
 
         ParseAst.Var { varType = ParseAst.CapVar, name } ->
             when Dict.get name context.scopedCtors is

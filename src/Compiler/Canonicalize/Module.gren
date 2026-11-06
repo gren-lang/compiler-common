@@ -2,9 +2,10 @@ module Compiler.Canonicalize.Module exposing
     ( SourceModule
     , Context
     , emptyContext
-    , Error (..)
+    , Error
+    , ModuleError (..)
     , errorToString
-    , canonicalize
+    , run
     )
 
 import Compiler.Ast.Source as ParseAst
@@ -39,7 +40,14 @@ emptyContext =
     }
 
 
-type Error
+type alias Error =
+    { package : PackageName
+    , moduleName : ModuleName
+    , error : ModuleError
+    }
+
+
+type ModuleError
     = PlaceholderError
     | ExpressionError Expression.Error
     | CyclicDependency ModuleName
@@ -50,7 +58,7 @@ type Error
 
 {-| Returns a human-readable description of an `Error`.
 -}
-errorToString : Error -> String
+errorToString : ModuleError -> String
 errorToString error =
     when error is
         PlaceholderError ->
@@ -75,13 +83,20 @@ errorToString error =
 {-| Takes in a `Dict` of parsed modules, where the `String` key represents a module name, and returns
 a `Dict` of canonicalized modules, or `Error`
 -}
-canonicalize : PackageName -> Dict String SourceModule -> Context -> Result Error Context
-canonicalize pkg parsedModules context =
+run : PackageName -> Dict String SourceModule -> Context -> Result Error Context
+run pkg parsedModules context =
     Dict.foldl
         (\key parsedModule resultAcc ->
             Result.andThen
                 (\contextAcc ->
                     canonicalizeModule pkg parsedModules contextAcc Set.empty parsedModule []
+                        |> Result.mapError
+                            (\e ->
+                                { package = parsedModule.package
+                                , moduleName = (ParseAst.moduleName parsedModule.ast).value
+                                , error = e
+                                }
+                            )
                 )
                 resultAcc
         )
@@ -98,7 +113,7 @@ canonicalizeModule :
     Set String ->
     SourceModule ->
     Array ModuleName ->
-    Result Error Context
+    Result ModuleError Context
 canonicalizeModule pkg parsedModules context recursionStack sourceModule args =
     let
         modName =
@@ -143,7 +158,7 @@ canonicalizeDependencies :
     Context ->
     Set String ->
     ParseAst.Module ->
-    Result Error Context
+    Result ModuleError Context
 canonicalizeDependencies pkg parsedModules context recursionStack ast =
     let
         depNames =
@@ -224,7 +239,7 @@ getModuleDependencies mod =
 
 {-| Canonicalize module content.
 -}
-canonicalizeModuleContent : ModuleName -> PackageName -> SourceModule -> Context -> Result Error Context
+canonicalizeModuleContent : ModuleName -> PackageName -> SourceModule -> Context -> Result ModuleError Context
 canonicalizeModuleContent realName pkg parsedModule context =
     when parsedModule.ast is
         ParseAst.Implementation impl ->
@@ -829,7 +844,7 @@ dummyAnnotation =
 
 {-| Canonicalize exports from a module.
 -}
-canonicalizeExports : ParseAst.ModuleImplementation -> SourcePosition.Region -> Result Error CanonicalAst.Exports
+canonicalizeExports : ParseAst.ModuleImplementation -> SourcePosition.Region -> Result ModuleError CanonicalAst.Exports
 canonicalizeExports impl region =
     when impl.exports is
         ParseAst.Open ->
@@ -894,7 +909,7 @@ canonicalizeExports impl region =
 
 {-| Canonicalize a single union
 -}
-canonicalizeUnion : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> Expression.Context -> ParseAst.Union -> Result Error CanonicalAst.Union
+canonicalizeUnion : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> Expression.Context -> ParseAst.Union -> Result ModuleError CanonicalAst.Union
 canonicalizeUnion moduleName knownTypes localParsedTypes context value =
     let
         altsResult =
@@ -950,7 +965,7 @@ canonicalizeUnion moduleName knownTypes localParsedTypes context value =
 
 {-| Canonicalize a single definition (value).
 -}
-canonicalizeDef : Expression.Context -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Value -> Result Error CanonicalAst.Def
+canonicalizeDef : Expression.Context -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Value -> Result ModuleError CanonicalAst.Def
 canonicalizeDef context knownTypes parsedLocalTypes value =
     Result.map3
         (\maybeSign params body ->
@@ -1092,7 +1107,7 @@ deepDealias t =
 
 {-| Canonicalize effects.
 -}
-canonicalizeEffects : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Effects -> Result Error CanonicalAst.Effects
+canonicalizeEffects : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Effects -> Result ModuleError CanonicalAst.Effects
 canonicalizeEffects home scopedTypes parsedLocalTypes effects =
     when effects is
         ParseAst.NoEffects ->
@@ -1140,7 +1155,7 @@ canonicalizeEffects home scopedTypes parsedLocalTypes effects =
                 )
 
 
-canonicalizePort : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Port -> Result Error CanonicalAst.Port
+canonicalizePort : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Port -> Result ModuleError CanonicalAst.Port
 canonicalizePort moduleName scopedTypes parsedLocalTypes port_ =
     canonicalizeType moduleName scopedTypes parsedLocalTypes port_.signature
         |> Result.andThen 
@@ -1254,7 +1269,7 @@ canonicalizePort moduleName scopedTypes parsedLocalTypes port_ =
             )
 
 
-checkPayload : CanonicalAst.Type -> Result { tipe : CanonicalAst.Type, error : Error } {}
+checkPayload : CanonicalAst.Type -> Result { tipe : CanonicalAst.Type, error : ModuleError } {}
 checkPayload tipe =
   when tipe is
     CanonicalAst.TAlias { fields, aliasTipe } ->
@@ -1322,7 +1337,7 @@ type LocalTypeKind
     | TypeAlias ParseAst.Alias
     
 
-canonicalizeType : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Type -> Result Error CanonicalAst.Type
+canonicalizeType : ModuleName -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Type -> Result ModuleError CanonicalAst.Type
 canonicalizeType home scopedTypes parsedLocalTypes tipe =
     when tipe.value is
         ParseAst.TLambda lambda ->
