@@ -45,17 +45,6 @@ Ok
                             , params = 
                                 [
                                     { end = 
-                                        { col = 8
-                                        , row = 5 
-                                        }
-                                    , start = 
-                                        { col = 7
-                                        , row = 5 
-                                        }
-                                    , value = PVar "b" 
-                                    }
-                                , 
-                                    { end = 
                                         { col = 6
                                         , row = 5 
                                         }
@@ -64,6 +53,17 @@ Ok
                                         , row = 5 
                                         }
                                     , value = PVar "a" 
+                                    }
+                                , 
+                                    { end = 
+                                        { col = 8
+                                        , row = 5 
+                                        }
+                                    , start = 
+                                        { col = 7
+                                        , row = 5 
+                                        }
+                                    , value = PVar "b" 
                                     }
                                 ] 
                             } 

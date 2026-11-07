@@ -977,53 +977,66 @@ canonicalizeUnion moduleName knownTypes localParsedTypes context value =
 -}
 canonicalizeDef : Expression.Context -> ScopedEntries CanonicalAst.Type -> Dict String LocalTypeKind -> ParseAst.Value -> Result ModuleError CanonicalAst.Def
 canonicalizeDef context knownTypes parsedLocalTypes value =
-    Result.map3
-        (\maybeSign params body ->
-            when maybeSign is
-                Nothing ->
-                    CanonicalAst.Def
-                        { name = value.name
-                        , params = params
-                        , body = body
-                        }
-
-                Just sign ->
-                    CanonicalAst.TypedDef
-                        { name = value.name
-                        , freeVars = Set.empty -- TODO
-                        , params =
-                            -- TODO: what about when params > types?
-                            Array.map2
-                                (\p t -> { pattern = p, tipe = t })
-                                params
-                                (tipeAsArray sign)
-                        , body = body
-                        , signature = sign
-                        }
+    Array.foldl
+        (\pat acc ->
+            Result.andThen
+                (\current ->
+                    Result.map
+                        (\p -> Array.pushLast p current)
+                        (Expression.canonicalizePattern context pat)
+                )
+                acc
         )
-        (when value.signature is
-            Nothing ->
-                Ok Nothing
+        (Ok [])
+        value.args
+        |> Result.mapError ExpressionError
+        |> Result.andThen
+            (\params ->
+                let
+                    bodyResult =
+                        params
+                            |> Expression.extractBoundNames
+                            |> Result.andThen (Expression.extendScopeWithNames context)
+                            |> Result.andThen
+                                (\bodyContext ->
+                                    Expression.canonicalize bodyContext value.body
+                                )
+                            |> Result.mapError ExpressionError
+                in
+                Result.map2
+                    (\maybeSign body ->
+                        when maybeSign is
+                            Nothing ->
+                                CanonicalAst.Def
+                                    { name = value.name
+                                    , params = params
+                                    , body = body
+                                    }
 
-            Just s ->
-                canonicalizeType context.currentModule knownTypes parsedLocalTypes s.type_
-                    |> Result.map Just
-        )
-        (Array.foldl
-            (\pat acc ->
-                Result.andThen
-                    (\current ->
-                        Result.map
-                            (\p -> Array.append current [p])
-                            (Expression.canonicalizePattern context pat)
+                            Just sign ->
+                                CanonicalAst.TypedDef
+                                    { name = value.name
+                                    , freeVars = Set.empty -- TODO
+                                    , params =
+                                        -- TODO: what about when params > types?
+                                        Array.map2
+                                            (\p t -> { pattern = p, tipe = t })
+                                            params
+                                            (tipeAsArray sign)
+                                    , body = body
+                                    , signature = sign
+                                    }
                     )
-                    acc
+                    (when value.signature is
+                        Nothing ->
+                            Ok Nothing
+
+                        Just s ->
+                            canonicalizeType context.currentModule knownTypes parsedLocalTypes s.type_
+                                |> Result.map Just
+                    )
+                    bodyResult
             )
-            (Ok [])
-            value.args
-            |> Result.mapError ExpressionError
-        )
-        (Expression.canonicalize context value.body |> Result.mapError ExpressionError)
 
 
 tipeAsArray : CanonicalAst.Type -> Array CanonicalAst.Type
