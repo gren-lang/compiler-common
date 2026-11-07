@@ -90,18 +90,24 @@ run pkg parsedModules context =
             Result.andThen
                 (\contextAcc ->
                     canonicalizeModule pkg parsedModules contextAcc Set.empty parsedModule []
-                        |> Result.mapError
-                            (\e ->
-                                { package = parsedModule.package
-                                , moduleName = (ParseAst.moduleName parsedModule.ast).value
-                                , error = e
-                                }
-                            )
                 )
                 resultAcc
         )
         (Ok context)
         parsedModules
+
+
+-- TODO: test correct error locations
+annotateError : SourceModule -> Result ModuleError Context -> Result Error Context
+annotateError sourceModule res =
+    Result.mapError
+        (\e ->
+            { package = sourceModule.package
+            , moduleName = (ParseAst.moduleName sourceModule.ast).value
+            , error = e
+            }
+        )
+        res
 
 
 {-| Canonicalize a full module, ensuring dependencies are canonicalized first.
@@ -113,7 +119,7 @@ canonicalizeModule :
     Set String ->
     SourceModule ->
     Array ModuleName ->
-    Result ModuleError Context
+    Result Error Context
 canonicalizeModule pkg parsedModules context recursionStack sourceModule args =
     let
         modName =
@@ -130,6 +136,7 @@ canonicalizeModule pkg parsedModules context recursionStack sourceModule args =
 
     else if Set.member modNameString recursionStack then
         Err (CyclicDependency modName)
+            |> annotateError sourceModule
 
     else
         let
@@ -145,8 +152,9 @@ canonicalizeModule pkg parsedModules context recursionStack sourceModule args =
                         -- TODO: verify module signatures
                         applyModuleParameters args sourceModule
         in
-        canonicalizeDependencies pkg parsedModules context newStack appliedModule.ast
-            |> Result.andThen (canonicalizeModuleContent modName pkg appliedModule)
+        canonicalizeDependencies pkg parsedModules context newStack appliedModule
+            |> Result.andThen
+                (canonicalizeModuleContent modName pkg appliedModule >> annotateError appliedModule)
 
 
 {-| Canonicalize dependencies of a module.
@@ -157,12 +165,12 @@ canonicalizeDependencies :
     Dict String SourceModule ->
     Context ->
     Set String ->
-    ParseAst.Module ->
-    Result ModuleError Context
-canonicalizeDependencies pkg parsedModules context recursionStack ast =
+    SourceModule ->
+    Result Error Context
+canonicalizeDependencies pkg parsedModules context recursionStack sourceMod =
     let
         depNames =
-            getModuleDependencies ast
+            getModuleDependencies sourceMod.ast
     in
     Array.foldl
         (\dep accResult ->
@@ -185,10 +193,12 @@ canonicalizeDependencies pkg parsedModules context recursionStack ast =
                         Nothing ->
                             if String.startsWith "Gren.Kernel." depNameStr then
                                 -- kernel module, ignore
+                                -- TODO write tests
                                 Ok newContext
 
                             else
                                 Err (ModuleNotFound dep.name)
+                                    |> annotateError sourceMod
                 )
                 accResult
         )
