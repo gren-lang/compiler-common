@@ -2,7 +2,7 @@ module Snapshot.Compiler.Canonicalize.Module exposing (tests)
 
 import Snapshot exposing (describe, test)
 import String.Parser.Advanced as Parser
-import Compiler.Canonicalize.Module as Canonicalize exposing (SourceModule, Error(..))
+import Compiler.Canonicalize.Module as Canonicalize exposing (SourceModule, Error, ModuleError (..))
 import Compiler.Ast.Source as ParseAst
 import Compiler.Ast.Canonical as CanonicalAst
 import Compiler.Parse.Context exposing (Context)
@@ -77,6 +77,21 @@ tests =
 
                         x : Int -> Int -> Int
                         x a b = 42
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            , test "Function arguments in use" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module MyModule exposing (..)
+
+                        type alias Int = {}
+
+                        neg : Int -> Int -> Int
+                        neg n = -n
                         """
                       }
                     ]
@@ -535,7 +550,7 @@ parseModule mod =
 
 canonicalizeModules : Dict String Canonicalize.SourceModule -> Result (Array String) Canonicalize.Context
 canonicalizeModules parsedMods =
-    when Canonicalize.canonicalize PackageName.example parsedMods Canonicalize.emptyContext is
+    when Canonicalize.run PackageName.example parsedMods Canonicalize.emptyContext is
         Err canErrs ->
             Err [ Debug.toString canErrs ]
 

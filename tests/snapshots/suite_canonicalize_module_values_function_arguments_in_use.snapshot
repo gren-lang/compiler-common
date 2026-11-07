@@ -1,0 +1,3 @@
+Err 
+    ["{ error = ExpressionError (UnknownVar { end = { col = 11, row = 6 }, start = { col = 10, row = 6 }, value = \"n\" }), moduleName = ModuleName \"MyModule\", package = PackageName { author = \"example\", name = \"package\" } }"
+    ]

@@ -242,7 +242,13 @@ tests =
                     context =
                         moduleContext "Test"
                 in
-                expectCanonicalizeError context "unknownVar" (Canonicalize.UnknownVar "unknownVar")
+                expectCanonicalizeError context "unknownVar"
+                    (Canonicalize.UnknownVar
+                        { start = { row = 1, col = 1 }
+                        , end = { row = 1, col = 11 }
+                        , value = "unknownVar"
+                        }
+                    )
             ]
         , describe "Ctor"
             [ test "Variable in scope resolves to VarLocal" <| \_ ->
