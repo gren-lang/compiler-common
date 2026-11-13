@@ -185,6 +185,148 @@ tests =
 
                         _ ->
                             Expect.fail "Expected Let"
+            , test "Let functions arguments is in scope in function body" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                in
+                expectCanonicalizeFlex context "let id x = x in id 1" <| \result ->
+                    when result is
+                        CanonicalAst.Let letOpts ->
+                            Expect.all
+                                [ .body >> .value >> Expect.equal
+                                    (CanonicalAst.Call
+                                        { fn =
+                                            SourcePosition.at
+                                                { row = 1, col = 17 }
+                                                { row = 1, col = 19 }
+                                                (CanonicalAst.VarLocal "id")
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 20 }
+                                                { row = 1, col = 21 }
+                                                (CanonicalAst.Int 1)
+                                            ]
+                                        }
+                                    )
+                                , .def >> Expect.equal
+                                    (CanonicalAst.Def
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 5 }
+                                                { row = 1, col = 7 }
+                                                "id"
+                                        , params =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 8 }
+                                                { row = 1, col = 9 }
+                                                (CanonicalAst.PVar "x")
+                                            ]
+                                        , body =
+                                            SourcePosition.at
+                                                { row = 1, col = 12 }
+                                                { row = 1, col = 13 }
+                                                (CanonicalAst.VarLocal "x")
+                                        }
+                                    )
+                                ]
+                                letOpts
+
+                        _ ->
+                            Expect.fail "Expected Let"
+            , test "Let functions destructured name is in scope in function body" <| \_ ->
+                let
+                    myTypeCtors =
+                        [ { name = "Num"
+                          , index = 0
+                          , arg = Just (CanonicalAst.TVar "a")
+                          }
+                        ]
+                
+                    context =
+                        moduleContext "Test"
+                            |> withQualifiedCtors PackageName.example "Test" "Num" myTypeCtors
+                in
+                expectCanonicalizeFlex context "let unbox (Num n) = n in unbox (Num 1)" <| \result ->
+                    when result is
+                        CanonicalAst.Let letOpts ->
+                            Expect.all
+                                [ .body >> .value >> Expect.equal
+                                    (CanonicalAst.Call
+                                        { fn =
+                                            SourcePosition.at
+                                                { row = 1, col = 26 }
+                                                { row = 1, col = 31 }
+                                                (CanonicalAst.VarLocal "unbox")
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 32 }
+                                                { row = 1, col = 39 }
+                                                (CanonicalAst.Call
+                                                    { fn =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 33 }
+                                                            { row = 1, col = 36 }
+                                                            (CanonicalAst.VarCtor
+                                                                { opts = CanonicalAst.Normal
+                                                                , home = unsafeModuleName "Test"
+                                                                , name = "Num"
+                                                                , index = 0
+                                                                , annotation = dummyAnnotation
+                                                                }
+                                                            )
+                                                    , args =
+                                                        [ SourcePosition.at
+                                                            { row = 1, col = 37 }
+                                                            { row = 1, col = 38 }
+                                                            (CanonicalAst.Int 1)
+                                                        ]
+                                                    }
+                                                )
+                                            ]
+                                        }
+                                    )
+                                , .def >> Expect.equal
+                                    (CanonicalAst.Def
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 5 }
+                                                { row = 1, col = 10 }
+                                                "unbox"
+                                        , params =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 12 }
+                                                { row = 1, col = 17 }
+                                                (CanonicalAst.PCtor
+                                                    { home = unsafeModuleName "Test"
+                                                    , tipe = "Num"
+                                                    , union = unionFromCtors "Num" myTypeCtors
+                                                    , name = "Num"
+                                                    , index = 0
+                                                    , arg =
+                                                        Just
+                                                            { tipe = CanonicalAst.TVar "a"
+                                                            , arg =
+                                                                SourcePosition.at
+                                                                    { row = 1, col = 16 }
+                                                                    { row = 1, col = 17 }
+                                                                    (CanonicalAst.PVar "n")
+                                                            }
+                                                    }
+                                                )
+                                            ]
+                                        , body =
+                                            SourcePosition.at
+                                                { row = 1, col = 21 }
+                                                { row = 1, col = 22 }
+                                                (CanonicalAst.VarLocal "n")
+                                        }
+                                    )
+                                ]
+                                letOpts
+
+                        _ ->
+                            Expect.fail "Expected Let"
             , test "LetRec with multiple definitions" <| \_ ->
                 let
                     context =
@@ -535,6 +677,108 @@ tests =
                                             { row = 1, col = 18 }
                                             { row = 1, col = 19 }
                                             (CanonicalAst.Int 0)
+                                      }
+                                    ]
+                                ]
+                                opts
+
+                        _ ->
+                            Expect.fail "Expected when"
+            , test "Catch-all name is available in branch body" <| \_ ->
+                let
+                    context =
+                        moduleContext "Test"
+                            |> withScopedLocal "num"
+                in
+                expectCanonicalizeFlex context "when 1 is x -> x" <| \result ->
+                    when result is
+                        CanonicalAst.When opts ->
+                            Expect.all
+                                [ .expression >> .value >> Expect.equal (CanonicalAst.Int 1)
+                                , .branches >> Expect.equalArrays
+                                    [ { pattern =
+                                          SourcePosition.at
+                                            { row = 1, col = 11 }
+                                            { row = 1, col = 12 }
+                                            (CanonicalAst.PVar "x")
+                                      , expression =
+                                          SourcePosition.at
+                                            { row = 1, col = 16 }
+                                            { row = 1, col = 17 }
+                                            (CanonicalAst.VarLocal "x")
+                                      }
+                                    ]
+                                ]
+                                opts
+
+                        _ ->
+                            Expect.fail "Expected when"
+            , test "Destructured name is in scope in function body" <| \_ ->
+                let
+                    myTypeCtors =
+                        [ { name = "Num"
+                          , index = 0
+                          , arg = Just (CanonicalAst.TVar "a")
+                          }
+                        ]
+                
+                    context =
+                        moduleContext "Test"
+                            |> withQualifiedCtors PackageName.example "Test" "Num" myTypeCtors
+                in
+                expectCanonicalizeFlex context "when Num 1 is Num n -> n" <| \result ->
+                    when result is
+                        CanonicalAst.When opts ->
+                            Expect.all
+                                [ .expression >> .value >> Expect.equal
+                                    (CanonicalAst.Call
+                                        { fn =
+                                            SourcePosition.at
+                                                { row = 1, col = 6 }
+                                                { row = 1, col = 9 }
+                                                (CanonicalAst.VarCtor
+                                                    { opts = CanonicalAst.Normal
+                                                    , home = unsafeModuleName "Test"
+                                                    , name = "Num"
+                                                    , index = 0
+                                                    , annotation = dummyAnnotation
+                                                    }
+                                                )
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 10 }
+                                                { row = 1, col = 11 }
+                                                (CanonicalAst.Int 1)
+                                            ]
+                                        }
+                                    )
+                                , .branches >> Expect.equalArrays
+                                    [ { pattern =
+                                          SourcePosition.at
+                                            { row = 1, col = 15 }
+                                            { row = 1, col = 20 }
+                                            (CanonicalAst.PCtor
+                                                { home = unsafeModuleName "Test"
+                                                , tipe = "Num"
+                                                , union = unionFromCtors "Num" myTypeCtors
+                                                , name = "Num"
+                                                , index = 0
+                                                , arg =
+                                                    Just
+                                                        { tipe = CanonicalAst.TVar "a"
+                                                        , arg =
+                                                            SourcePosition.at
+                                                                { row = 1, col = 19 }
+                                                                { row = 1, col = 20 }
+                                                                (CanonicalAst.PVar "n")
+                                                        }
+                                                }
+                                            )
+                                      , expression =
+                                          SourcePosition.at
+                                            { row = 1, col = 24 }
+                                            { row = 1, col = 25 }
+                                            (CanonicalAst.VarLocal "n")
                                       }
                                     ]
                                 ]

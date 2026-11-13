@@ -426,7 +426,12 @@ canonicalize_ context start end expr =
                             canonicalizePattern context pattern
                                 |> Result.andThen
                                     (\canPattern ->
-                                        canonicalize context body
+                                        extractBoundNames [canPattern]
+                                            |> Result.andThen (extendScopeWithNames context)
+                                            |> Result.andThen
+                                                (\bodyContext ->
+                                                    canonicalize bodyContext body
+                                                )
                                             |> Result.map
                                                 (\canBody ->
                                                     Array.pushLast
@@ -676,7 +681,6 @@ toBinop op left right =
 
 canonicalizePattern : Context -> ParseAst.Pattern -> Result Error CanonicalAst.Pattern
 canonicalizePattern context pat =
-    -- TODO: name extraction?
     when pat.value is
         ParseAst.PAnything _ ->
             Ok (SourcePosition.at pat.start pat.end CanonicalAst.PAnything)
@@ -903,8 +907,13 @@ extractBoundNames patterns =
                 CanonicalAst.PBool _ ->
                     []
 
-                CanonicalAst.PCtor _ ->
-                    []  -- TODO: implement when we add constructor support
+                CanonicalAst.PCtor { arg = maybeArg } ->
+                    when maybeArg is
+                        Just { arg } ->
+                            extractFromPattern arg
+
+                        Nothing ->
+                            []
 
         extractFromRecordField : CanonicalAst.PatternRecordField -> Array (SourcePosition.Located String)
         extractFromRecordField locatedField =
