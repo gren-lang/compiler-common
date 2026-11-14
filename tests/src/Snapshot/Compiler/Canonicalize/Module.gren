@@ -358,6 +358,54 @@ tests =
                       }
                     ]
                     |> Snapshot.this
+            , test "Imported by expose" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module Math exposing (..)
+
+                        infix left 6 (+) = add
+
+                        add a b = 0
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module MathUse exposing (..)
+
+                        import Math exposing ((+))
+
+                        unrelated = 5 + 10 + 15
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
+            , test "Imported by expose all" <| \_ ->
+                canonicalize
+                    [ { package = PackageName.example
+                      , source =
+                        """
+                        module Math exposing (..)
+
+                        infix left 6 (+) = add
+
+                        add a b = 0
+                        """
+                      }
+                    , { package = PackageName.example
+                      , source =
+                        """
+                        module MathUse exposing (..)
+
+                        import Math exposing (..)
+
+                        unrelated = 5 + 10 + 15
+                        """
+                      }
+                    ]
+                    |> Snapshot.this
             ]
         , describe "Exposing"
             [ test "All the things" <| \_ ->

@@ -363,7 +363,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                                 canMod.unions
 
                                         scopedEntriesQualified =
-                                            -- doesn't respect module exports
+                                            -- TODO: respect module exports
                                             Array.foldl
                                                 (\t acc -> ScopedEntries.addQualified t.home t.name t.tipe acc )
                                                 ScopedEntries.empty
@@ -377,7 +377,7 @@ canonicalizeModuleContent realName pkg parsedModule context =
                                                 CanonicalAst.ExportEverything _ ->
                                                     entries
                                     in
-                                    -- doesn't respect import exposing
+                                    -- TODO: respect import exposing
                                     Array.foldl
                                         (\t acc -> ScopedEntries.add t.name t.tipe acc)
                                         scopedEntriesQualified
@@ -653,6 +653,35 @@ createExpressionContext pkg moduleContext parsedModule =
                     Dict.set infix.symbol { moduleName = parsedModule.name.value, operator = infix } acc
                 )
                 Dict.empty
+            |> (\internalBinops ->
+                Array.foldl
+                    (\{ value = extMod } bins ->
+                        when Dict.get (ModuleName.toString extMod.module_.value) moduleContext.modules is
+                            Nothing ->
+                                bins
+
+                            Just canMod ->
+                                -- TODO: respect import and module exposing 
+                                Dict.foldl
+                                    (\symbol op acc ->
+                                        Dict.set
+                                            symbol
+                                            { moduleName = parsedModule.name.value
+                                            , operator =
+                                                { associativity = op.associativity
+                                                , fn = op.name
+                                                , precedence = op.precedence
+                                                , symbol = symbol
+                                                }
+                                            }
+                                            acc
+                                    )
+                                    bins
+                                    canMod.binops
+                    )
+                    internalBinops
+                    parsedModule.imports
+            )
     }
 
 
